@@ -12,3 +12,9 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.1.0] - 2021-10-20
+
+* Initial release
+
+
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.0...master
