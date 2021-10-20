@@ -277,9 +277,10 @@ init_changelog_file() {
       echo -e
       echo -e
     } > "${changelog_file}"
+
+    info "You should now add, commit and push the new CHANGELOG file."
+    exit 0
   fi
-  info "You should now add, commit and push the new CHANGELOG file."
-  exit 0
 }
 
 validate_version_string() {
