@@ -12,6 +12,11 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.1.3] - 2021-10-20
+
+* Add more logging to ci_build.sh
+
+
 ## [v0.1.2] - 2021-10-20
 
 * Add github actions workflow
@@ -27,7 +32,8 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.2...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.3...master
+[v0.1.3]: https://github.com/at055612/release-it/compare/v0.1.2...v0.1.3
 [v0.1.2]: https://github.com/at055612/release-it/compare/v0.1.1...v0.1.2
 [v0.1.1]: https://github.com/at055612/release-it/compare/v0.1.0...v0.1.1
 [v0.1.0]: https://github.com/at055612/release-it/compare/v0.1.0...v0.1.0
