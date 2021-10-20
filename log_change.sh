@@ -199,8 +199,26 @@ validate_git_issue() {
 
     debug_value "curl_return_code" "${curl_return_code}"
 
+    # curl_return_code is NOT the http status, just sucess/fail
     if [[ "${curl_return_code}" -ne 0 ]]; then
-      error_exit "Issue ${BLUE}${git_issue}${NC} does not exist on GitHub"
+      # curl failed so check to see what the status code was
+      local http_status_code
+      http_status_code="$( \
+        curl \
+          --silent \
+          --output /dev/null \
+          --write-out "%{http_code}" \
+          "${github_issue_url}"\
+      )"
+      debug_value "http_status_code" "${http_status_code}"
+
+      if [[ "${http_status_code}" = "404" ]]; then
+        error_exit "Issue ${BLUE}${git_issue}${NC} does not exist on GitHub"
+      else
+        warn "Unable to obtain issue title for issue ${BLUE}${issue_number}${YELLOW}" \
+          "from GitHub (HTTP status: ${BLUE}${http_status_code}${YELLOW})"
+        issue_title=""
+      fi
     else
       info "Issue title: ${BLUE}${issue_title}${NC}"
     fi
