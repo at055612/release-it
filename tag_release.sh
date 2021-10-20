@@ -121,6 +121,8 @@ GITHUB_NAMESPACE=
 GITHUB_REPO=
 # The name of the git remote repo that the branch is tracking against.
 GIT_REMOTE_NAME='origin'
+# The name of the branch to compare unreleased changes to
+UNRELEASED_CHANGES_COMPARE_BRANCH='master'
 # ----------------------------------------------------------
 
 setup_echo_colours() {
@@ -569,7 +571,7 @@ modify_changelog() {
   else
     # No link so add one to the end
     debug "Appending unreleased link"
-    echo -e "\n[Unreleased]: ${GITHUB_URL_BASE}/compare/${next_release_version}...master" \
+    echo -e "\n[Unreleased]: ${GITHUB_URL_BASE}/compare/${next_release_version}...${UNRELEASED_CHANGES_COMPARE_BRANCH}" \
       >> "${changelog_file}"
   fi
 
@@ -743,6 +745,9 @@ create_config_file() {
   # The path to the directory containing the unreleased changes
   # relative to the repo root
   #UNRELEASED_CHANGES_REL_DIR='unreleased_changes'
+
+  # The name of the branch to compare unreleased changes to
+  #UNRELEASED_CHANGES_COMPARE_BRANCH='master'
 
   # If you want to run any validation that is specific to this repo then uncomment
   # this function and implement some validation
