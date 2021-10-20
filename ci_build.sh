@@ -105,8 +105,11 @@ else
   BUILD_VERSION="${BUILD_BRANCH}"
 fi
 
+pushd "${BUILD_DIR}" > /dev/null
+
 # Dump all the env vars to the console for debugging
 echo -e "HOME:                          [${GREEN}${HOME}${NC}]"
+echo -e "PWD:                           [${GREEN}$(pwd)${NC}]"
 echo -e "BUILD_DIR:                     [${GREEN}${BUILD_DIR}${NC}]"
 echo -e "BUILD_COMMIT:                  [${GREEN}${BUILD_COMMIT}${NC}]"
 echo -e "BUILD_BRANCH:                  [${GREEN}${BUILD_BRANCH}${NC}]"
@@ -115,8 +118,7 @@ echo -e "BUILD_IS_PULL_REQUEST:         [${GREEN}${BUILD_IS_PULL_REQUEST}${NC}]"
 echo -e "BUILD_VERSION:                 [${GREEN}${BUILD_VERSION}${NC}]"
 echo -e "git version:                   [${GREEN}$(git --version)${NC}]"
 
-pushd "${BUILD_DIR}" > /dev/null
-
+ls -l
 
 # If it is a tagged build copy all the files needed for the github release
 # artefacts
