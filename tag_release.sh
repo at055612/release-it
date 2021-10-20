@@ -255,6 +255,33 @@ do_release() {
   fi
 }
 
+init_changelog_file() {
+  debug "init_changelog_file() called"
+
+  if [ ! -f "${changelog_file}" ]; then
+    info "Creating skeleton ${BLUE}${CHANGELOG_FILENAME}${GREEN} file"
+
+    {
+      echo -e "# Change Log"
+      echo -e "All notable changes to this project will be documented in this file."
+      echo -e
+      echo -e "The format is based on [Keep a Changelog](http://keepachangelog.com/) "
+      echo -e "and this project adheres to [Semantic Versioning](http://semver.org/)."
+      echo -e
+      echo -e
+      echo -e "## [Unreleased]"
+      echo -e 
+      echo -e "~~~"
+      echo -e "DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh"
+      echo -e "~~~"
+      echo -e
+      echo -e
+    } > "${changelog_file}"
+  fi
+  info "You should now add, commit and push the new CHANGELOG file."
+  exit 0
+}
+
 validate_version_string() {
   if [[ ! "${version}" =~ ${RELEASE_VERSION_REGEX} ]]; then
       local msgs=("Version [${BLUE}${version}${GREEN}] does not match the release"
@@ -267,15 +294,6 @@ validate_version_string() {
     fi
   else
     return 0
-  fi
-}
-
-validate_changelog_exists() {
-  debug "validate_changelog_exists() called"
-
-  if [ ! -f "${changelog_file}" ]; then
-    error_exit "The file ${BLUE}${changelog_file}${GREEN} does not exist in the" \
-      "current directory.${NC}"
   fi
 }
 
@@ -575,17 +593,21 @@ modify_changelog() {
       >> "${changelog_file}"
   fi
 
+  local new_link_line
   if [ -n "${prev_release_version}" ]; then
     # We have a prev release to compare to so add in the compare link for 
     # prev release to next release
     new_link_line="[${next_release_version}]: ${GITHUB_URL_BASE}/compare/${prev_release_version}...${next_release_version}"
-    debug "Appending compare link"
-    sed \
-      --regexp-extended \
-      --in-place'' \
-      "/${UNRELEASED_LINK_REGEX}/a ${new_link_line}" \
-      "${changelog_file}"
+  else
+    new_link_line="[${next_release_version}]: ${GITHUB_URL_BASE}/compare/${next_release_version}...${next_release_version}"
   fi
+
+  debug "Appending compare link"
+  sed \
+    --regexp-extended \
+    --in-place'' \
+    "/${UNRELEASED_LINK_REGEX}/a ${new_link_line}" \
+    "${changelog_file}"
 
   # Treats the whole file as one big line which is a bit sub-prime
   # for a big changelog, but not a massive issue.
@@ -879,8 +901,9 @@ main() {
   local curr_date
   curr_date="$(date +%Y-%m-%d)"
 
+  init_changelog_file
+
   # Initial validation before we start modifying the changelog
-  validate_changelog_exists
   validate_unreleased_heading_in_changelog
   validate_for_uncommitted_work
   validate_local_vs_remote
