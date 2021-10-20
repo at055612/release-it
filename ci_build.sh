@@ -4,6 +4,7 @@
 set -eo pipefail
 
 RELEASE_ARTEFACTS_DIR="${BUILD_DIR}/release_artefacts"
+RELEASE_MANIFEST="${RELEASE_ARTEFACTS_DIR}/release-artefacts.txt"
 
 # Shell Colour constants for use in 'echo -e'
 # e.g.  echo -e "My message ${GREEN}with just this text in green${NC}"
@@ -45,7 +46,6 @@ copy_release_artefact() {
     "to ${BLUE}${dest}${NC}"
 
   mkdir -p "${RELEASE_ARTEFACTS_DIR}"
-
   cp "${source}" "${dest}"
 
   local filename
@@ -54,6 +54,7 @@ copy_release_artefact() {
   else
     filename="$(basename "${source}")"
   fi
+
 
   # Add an entry to a manifest file for the release artefacts
   echo "${filename} - ${description}" \
@@ -74,17 +75,17 @@ gather_release_artefacts() {
   # Stroom
   copy_release_artefact \
     "${BUILD_DIR}/CHANGELOG.md" \
-    "${RELEASE_ARTEFACTS_DIR}" \
+    "${RELEASE_ARTEFACTS_DIR}/" \
     "Change log for this release"
 
   copy_release_artefact \
     "${BUILD_DIR}/tag_release.sh" \
-    "${RELEASE_ARTEFACTS_DIR}" \
+    "${RELEASE_ARTEFACTS_DIR}/" \
     "The script for initiating a release"
 
   copy_release_artefact \
     "${BUILD_DIR}/log_change.sh" \
-    "${RELEASE_ARTEFACTS_DIR}" \
+    "${RELEASE_ARTEFACTS_DIR}/" \
     "The script for recording a change entry"
 
   # Now generate hashes for all the zips
