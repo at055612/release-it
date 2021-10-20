@@ -12,10 +12,16 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.1.1] - 2021-10-20
+
+* Fix commit message logic
+
+
 ## [v0.1.0] - 2021-10-20
 
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.0...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.1...master
+[v0.1.1]: https://github.com/at055612/release-it/compare/v0.1.0...v0.1.1
 [v0.1.0]: https://github.com/at055612/release-it/compare/v0.1.0...v0.1.0
