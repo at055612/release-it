@@ -225,8 +225,13 @@ do_release() {
   local commit_msg
   # delete all lines up to and including the desired version header
   # then output all lines until quitting when you hit the next 
-  # version header
-  commit_msg="$(sed "1,/^\s*##\s*\[${version}\]/d;/## \[/Q" "${changelog_file}")"
+  # version header ('## [' or '[')
+  commit_msg="$( \
+    sed  \
+      --regexp-extended \
+      "1,/^\s*##\s*\[${version}\]/d;/^(## )?\[/Q"  \
+      "${changelog_file}" \
+    )"
 
   # Add the release version as the top line of the commit msg, followed by
   # two new lines
