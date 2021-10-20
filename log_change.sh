@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
 ##########################################################################
+# Version: <BUILD_VERSION>
+# Date: <BUILD_DATE>
+#
 # Script to record changelog entries in individual files to get around
 # the issue of merge conflicts on the CHANGELOG file when doing PRs.
 #
@@ -11,6 +14,7 @@
 # This script is used in conjunction with tag_release.sh which adds the
 # change entries to the CHANGELOG at release time.
 ##########################################################################
+
 
 set -euo pipefail
 
