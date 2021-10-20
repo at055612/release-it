@@ -16,6 +16,7 @@
 # limitations under the License.
 # **********************************************************************
 
+# Version: <BUILD_VERSION> Date: <BUILD_DATE>
 
 # This script is for tagging a git repository for the purpose of driving a
 # separate release process from that tagged commit. It also updates the 

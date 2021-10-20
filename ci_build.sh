@@ -94,6 +94,23 @@ gather_release_artefacts() {
   done
 }
 
+set_version_and_date() {
+
+  local file="$1"; shift
+
+  echo -e "${GREEN}Setting BUILD_VERSION to ${BLUE}${BUILD_VERSION}${GREEN}" \
+    "in file ${BLUE}${file}${NC}"
+  echo -e "${GREEN}Setting BUILD_DATE to ${BLUE}${BUILD_DATE}${GREEN}" \
+    "in file ${BLUE}${file}${NC}"
+
+  sed \
+    --in-place'' \
+    --regexp-extended \
+    --expression "s/<BUILD_VERSION>/${BUILD_VERSION}/" \
+      --expression "s/<BUILD_DATE>/${BUILD_DATE}/" \
+    "${file}"
+}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Script proper starts here
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -106,6 +123,8 @@ else
   # No tag so use the branch name as the version, e.g. dev
   BUILD_VERSION="${BUILD_BRANCH}"
 fi
+
+BUILD_DATE="$(date --iso-8601=seconds)"
 
 pushd "${BUILD_DIR}" > /dev/null
 
@@ -122,6 +141,9 @@ echo -e "RELEASE_ARTEFACTS_DIR:         [${GREEN}${RELEASE_ARTEFACTS_DIR}${NC}]"
 echo -e "git version:                   [${GREEN}$(git --version)${NC}]"
 
 ls -l
+
+set_version_and_date "./tag_release.sh"
+set_version_and_date "./log_change.sh"
 
 # If it is a tagged build copy all the files needed for the github release
 # artefacts
