@@ -12,6 +12,11 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.1.8] - 2021-10-20
+
+* Change change file comments to fenced block
+
+
 ## [v0.1.7] - 2021-10-20
 
 * Add check for github api http status
@@ -52,7 +57,8 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.7...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.8...master
+[v0.1.8]: https://github.com/at055612/release-it/compare/v0.1.7...v0.1.8
 [v0.1.7]: https://github.com/at055612/release-it/compare/v0.1.6...v0.1.7
 [v0.1.6]: https://github.com/at055612/release-it/compare/v0.1.5...v0.1.6
 [v0.1.5]: https://github.com/at055612/release-it/compare/v0.1.4...v0.1.5
