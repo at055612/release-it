@@ -41,7 +41,8 @@ copy_release_artefact() {
   local dest="$1"; shift
   local description="$1"; shift
 
-  echo -e "${GREEN}Copying release artefact ${BLUE}${source}${NC}"
+  echo -e "${GREEN}Copying release artefact ${BLUE}${source}${GREEN}" \
+    "to ${BLUE}${dest}${NC}"
 
   mkdir -p "${RELEASE_ARTEFACTS_DIR}"
 
@@ -116,6 +117,7 @@ echo -e "BUILD_BRANCH:                  [${GREEN}${BUILD_BRANCH}${NC}]"
 echo -e "BUILD_TAG:                     [${GREEN}${BUILD_TAG}${NC}]"
 echo -e "BUILD_IS_PULL_REQUEST:         [${GREEN}${BUILD_IS_PULL_REQUEST}${NC}]"
 echo -e "BUILD_VERSION:                 [${GREEN}${BUILD_VERSION}${NC}]"
+echo -e "RELEASE_ARTEFACTS_DIR:         [${GREEN}${RELEASE_ARTEFACTS_DIR}${NC}]"
 echo -e "git version:                   [${GREEN}$(git --version)${NC}]"
 
 ls -l
