@@ -12,6 +12,11 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.1.4] - 2021-10-20
+
+* Add missing constant to ci_build.sh
+
+
 ## [v0.1.3] - 2021-10-20
 
 * Add more logging to ci_build.sh
@@ -32,7 +37,8 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.3...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.4...master
+[v0.1.4]: https://github.com/at055612/release-it/compare/v0.1.3...v0.1.4
 [v0.1.3]: https://github.com/at055612/release-it/compare/v0.1.2...v0.1.3
 [v0.1.2]: https://github.com/at055612/release-it/compare/v0.1.1...v0.1.2
 [v0.1.1]: https://github.com/at055612/release-it/compare/v0.1.0...v0.1.1
