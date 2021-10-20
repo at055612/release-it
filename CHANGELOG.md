@@ -12,6 +12,11 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.1.6] - 2021-10-20
+
+* Add build data/version to log_change.sh
+
+
 ## [v0.1.5] - 2021-10-20
 
 * Add setting of build version and date
@@ -42,7 +47,8 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.5...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.6...master
+[v0.1.6]: https://github.com/at055612/release-it/compare/v0.1.5...v0.1.6
 [v0.1.5]: https://github.com/at055612/release-it/compare/v0.1.4...v0.1.5
 [v0.1.4]: https://github.com/at055612/release-it/compare/v0.1.3...v0.1.4
 [v0.1.3]: https://github.com/at055612/release-it/compare/v0.1.2...v0.1.3
