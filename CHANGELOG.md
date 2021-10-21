@@ -12,6 +12,17 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.2.0] - 2021-10-21
+
+* Fix change entry file validation
+
+* Add choice to open existing or create new
+
+* Add support for change entries in the changelog
+
+* Add more tidying of the whitespace in the changelog
+
+
 ## [v0.1.8] - 2021-10-20
 
 * Change change file comments to fenced block
@@ -57,7 +68,8 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.1.8...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.2.0...master
+[v0.2.0]: https://github.com/at055612/release-it/compare/v0.1.8...v0.2.0
 [v0.1.8]: https://github.com/at055612/release-it/compare/v0.1.7...v0.1.8
 [v0.1.7]: https://github.com/at055612/release-it/compare/v0.1.6...v0.1.7
 [v0.1.6]: https://github.com/at055612/release-it/compare/v0.1.5...v0.1.6
