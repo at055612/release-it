@@ -355,33 +355,31 @@ write_change_entry() {
   local all_content
 
   # Craft the content of the file
+  # shellcheck disable=SC2016
   all_content="$( \
     echo "${change_entry_line}" 
     echo
     echo
-    # shellcheck disable=SC2016
-    {
-      echo '```sh'
-      if [[ -n "${issue_title}" ]]; then
-        echo "# ********************************************************************************"
-        echo "# Issue title: ${issue_title}"
-        echo "# ********************************************************************************"
-        echo
-      fi
-      echo "# ONLY the top line will be included in the CHANGELOG."
-      echo "# Entries should be in GitHub flavour markdown and should be written on a SINGLE"
-      echo "# line with no hard breaks. You can have multiple change files for a single GitHub issue."
-      echo "#"
-      echo "# Examples of acceptable entires are:"
-      echo "#"
-      echo "#"
-      echo "# * Issue **1234** : A change with an associated GitHub issue in this repository"
-      echo "#"
-      echo "# * Issue **namespace/other-repo#1234** : A change with an associated GitHub issue in another repository"
-      echo "#"
-      echo "# * A change with no associated GitHub issue."
-      echo '```'
-    }
+    echo '```sh'
+    if [[ -n "${issue_title:-}" ]]; then
+      echo "# ********************************************************************************"
+      echo "# Issue title: ${issue_title}"
+      echo "# ********************************************************************************"
+      echo
+    fi
+    echo "# ONLY the top line will be included in the CHANGELOG."
+    echo "# Entries should be in GitHub flavour markdown and should be written on a SINGLE"
+    echo "# line with no hard breaks. You can have multiple change files for a single GitHub issue."
+    echo "#"
+    echo "# Examples of acceptable entires are:"
+    echo "#"
+    echo "#"
+    echo "# * Issue **1234** : A change with an associated GitHub issue in this repository"
+    echo "#"
+    echo "# * Issue **namespace/other-repo#1234** : A change with an associated GitHub issue in another repository"
+    echo "#"
+    echo "# * A change with no associated GitHub issue."
+    echo '```'
   )"
 
   info "Writing file ${BLUE}${change_file}${GREEN}:"
@@ -563,9 +561,9 @@ main() {
   else
     if [[ "${git_issue}" = "auto" ]]; then
       git_issue="$(get_git_issue_from_branch)"
-    else
-      validate_git_issue "${git_issue}"
     fi
+
+    validate_git_issue "${git_issue}"
 
     if [[ "${git_issue}" = "0" ]] \
       || ! is_existing_change_file_present "${git_issue}" "${change_text:-}"; then
