@@ -258,37 +258,41 @@ is_existing_change_file_present() {
   if [[ "${existing_file_count}" -eq 0 ]]; then
     debug "File does not exist"
     return 1
-  elif [[ "${existing_file_count}" -eq 1 ]]; then
-    debug "One file exists: ${existing_files[0]}"
-    # File exists for this issue so open it
-    info "A change entry file already exists for this issue:"
+  else 
+    # Multiple files exist for this 
+    debug "${existing_file_count} files exist"
+
+    info "Change file(s) already exist for this issue:"
     echo
 
     list_unreleased_changes "${git_issue_str}"
 
     echo
-    echo "Do you want to open this file or create a new change file for the issue?"
-    select user_input in  "Create new file" "Open existing file"; do
-      case $user_input in
-        "Create new file" ) 
-          write_change_entry "${git_issue}" "${change_text:-}"
-          break;;
-        "Open existing file" ) 
-          open_file_in_editor "${existing_file}"
-          validate_issue_line "${existing_file}"
-          break;;
-        *) 
-          echo "Invalid option. Try another one."
-          continue;;
-      esac
+    echo "Do you want to create a new change file for the issue or open an existing one?"
+
+    # Build the menu options
+    local menu_item_arr=()
+    menu_item_arr+=( "Create new file" )
+    for filename in "${existing_files[@]}"; do
+      menu_item_arr+=( "Open ${filename}" )
     done
 
-    return 0
-  else
-    # Multiple files exist for this 
-    debug "${existing_file_count} files exist"
-
-    # TODO
+    COLUMNS=1
+    select user_input in "${menu_item_arr[@]}"; do
+      if [[ "${user_input}" = "Create new file" ]]; then
+        write_change_entry "${git_issue}" "${change_text:-}"
+        break
+      elif [[ "${user_input}" =~ ^Open ]]; then
+        local chosen_file_name="${user_input#Open }"
+        debug_value "chosen_file_name" "${chosen_file_name}"
+        open_file_in_editor "${unreleased_dir}/${chosen_file_name}"
+        validate_issue_line "${unreleased_dir}/${chosen_file_name}"
+        break
+      else
+        echo "Invalid option. Try another one."
+        continue
+      fi
+    done
 
     return 0
   fi
@@ -348,7 +352,6 @@ write_change_entry() {
   local change_entry_line="${line_prefix}${issue_part}${change_text}"
   local all_content
 
-
   # Craft the content of the file
   all_content="$( \
     echo "${change_entry_line}" 
@@ -363,11 +366,11 @@ write_change_entry() {
         echo "# ********************************************************************************"
         echo
       fi
-      echo "# Only the top line will be included in the CHANGELOG."
-      echo "# Entries should be in GitHub flavour markdown and should be written on a single"
-      echo "# line with no hard breaks."
+      echo "# ONLY the top line will be included in the CHANGELOG."
+      echo "# Entries should be in GitHub flavour markdown and should be written on a SINGLE"
+      echo "# line with no hard breaks. You can have multiple change files for a single GitHub issue."
       echo "#"
-      echo "# Examples of accptable entires are:"
+      echo "# Examples of acceptable entires are:"
       echo "#"
       echo "#"
       echo "# * Issue **1234** : A change with an associated GitHub issue in this repository"
@@ -387,15 +390,6 @@ write_change_entry() {
   echo -e "${all_content}" > "${change_file}"
 
   if [[ -z "${change_text}" ]]; then
-
-    #read -n 1 -s -r -p "Press any key to continue"
-    #echo
-
-    # No change text so open the user's preferred editor or vi/vim if not set
-    #if ! open_file_in_editor "${change_file}"; then
-      ##rm "${change_file}"
-      #error_exit "Edit aborted by user. Deleting file ${BLUE}${change_file}${NC}"
-    #fi
     open_file_in_editor "${change_file}"
 
     validate_issue_line "${change_file}"
@@ -549,6 +543,9 @@ main() {
 
   debug_value "git_issue" "${git_issue}"
   debug_value "change_text" "${change_text}"
+
+  # TODO validate change_text against the text part of issue_line_regex if
+  # it is set
 
   validate_in_git_repo
 
