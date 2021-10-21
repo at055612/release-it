@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-IS_DEBUG=false
+IS_DEBUG=${IS_DEBUG:-false}
 UNRELEASED_DIR_NAME="unreleased_changes"
 
 setup_echo_colours() {
@@ -256,7 +256,7 @@ is_existing_change_file_present() {
 
     open_file_in_editor "${existing_file}"
 
-    validate_change_file "${existing_file}"
+    validate_issue_line "${existing_file}"
 
     return 0
   else
@@ -327,15 +327,13 @@ write_change_entry() {
     echo
     # shellcheck disable=SC2016
     {
+      echo '```sh'
       if [[ -n "${issue_title}" ]]; then
-        echo '```bash'
         echo "# ********************************************************************************"
         echo "# Issue title: ${issue_title}"
         echo "# ********************************************************************************"
-        echo '```'
         echo
       fi
-      echo '```bash'
       echo "# Only the top line will be included in the CHANGELOG."
       echo "# Entries should be in GitHub flavour markdown and should be written on a single"
       echo "# line with no hard breaks."
@@ -361,7 +359,8 @@ write_change_entry() {
 
   if [[ -z "${change_text}" ]]; then
 
-    read -n 1 -s -r -p "Press any key to continue"
+    #read -n 1 -s -r -p "Press any key to continue"
+    #echo
 
     # No change text so open the user's preferred editor or vi/vim if not set
     #if ! open_file_in_editor "${change_file}"; then
@@ -370,7 +369,7 @@ write_change_entry() {
     #fi
     open_file_in_editor "${change_file}"
 
-    validate_change_file "${change_file}"
+    validate_issue_line "${change_file}"
   fi
 }
 
@@ -394,6 +393,8 @@ open_file_in_editor() {
   # Open the user's preferred editor or vi/vim if not set
   "${editor}" "${file_to_open}"
 
+  echo ":::::::::::::::"
+
   local md5_after
   md5_after="$(md5sum "${file_to_open}" | cut -d' ' -f1)"
 
@@ -408,49 +409,92 @@ open_file_in_editor() {
   debug_value "return_code" "${return_code}" 
 }
 
-validate_change_file() {
-
+validate_issue_line() {
   local change_file="$1"; shift
-  # https://regex101.com/r/cSfrND/1 
-  local regex='^(#|(# |\* Issue \*\*([a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-.]+\#[0-9]+|[0-9]+)\*\* : |\* ).+)$'
-  local bad_lines=()
+  # Used to look for lines that might be a change entry
+  local simple_issue_line_regex="^\* [A-Z]"
 
-  local bad_lines
-  bad_lines="$( \
+  # A more complex regex to make sure the change entries are a consistent format
+  # https://regex101.com/r/fOO8lQ/1
+  local issue_line_regex="^\* (Issue \*\*([a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-.]+\#[0-9]+|#[0-9]+)\*\* : )?[A-Z][\w .!?\`\"'*\-]+$"
+
+  debug "Validating file ${change_file}"
+
+  local issue_line_count
+  issue_line_count="$( \
     grep \
-      --perl-regexp "${regex}" \
-      --invert-match \
-      "${change_file}" \
+      --count \
+      --perl-regexp \
+      "${simple_issue_line_regex}" \
+      "${change_file}"
     )"
 
-  if [[ -n "${bad_lines}" ]]; then
-    error "The following lines are not valid in ${BLUE}${change_file}${NC}:"
-    echo -e "--------------------------------------------------------------------------------"
-    echo -e "${bad_lines}"
-    echo -e "--------------------------------------------------------------------------------"
-    echo -e "Validation regex: ${BLUE}${regex}${NC}"
-    exit 1
-  fi
-  #while IFS= read -r line || [[ -n $line ]]; do
-    #if [[ ! "${line}" =~ ${regex} ]]; then
-      #debug_value "line" "${line}"
-      #bad_lines+=( "${line}" )
-    #fi
-  #done < "${change_file}"
+  debug_value "issue_line_count" "${issue_line_count}"
 
-  #if [[ "${#bad_lines[@]}" -gt 0 ]]; then
+  if [[ "${issue_line_count}" -eq 0 ]]; then
+      error_exit "No change entry line found in ${BLUE}${change_file}${NC}"
+  elif [[ "${issue_line_count}" -gt 1 ]]; then
+      error "Multiple change entry lines found in ${BLUE}${change_file}${NC}:"
+      echo -e "${DGREY}------------------------------------------------------------------------${NC}"
+      echo -e "$(grep --perl-regexp "${simple_issue_line_regex}" "${change_file}" )"
+      echo -e "${DGREY}------------------------------------------------------------------------${NC}"
+      echo -e "Validation regex: ${BLUE}${simple_issue_line_regex}${NC}"
+      exit 1
+  else
+    if ! head -n1 "${change_file}" | grep --quiet --perl-regexp "${issue_line_regex}"; then
+      error "The change entry is not valid in ${BLUE}${change_file}${NC}:"
+      echo -e "${DGREY}------------------------------------------------------------------------${NC}"
+      echo -e "$(head -n1 "${change_file}" )"
+      echo -e "${DGREY}------------------------------------------------------------------------${NC}"
+      echo -e "Validation regex: ${BLUE}${issue_line_regex}${NC}"
+      exit 1
+    fi
+  fi
+}
+
+#validate_change_file() {
+
+  #local change_file="$1"; shift
+  ## https://regex101.com/r/cSfrND/1 
+  #local regex='^(#|(# |\* Issue \*\*([a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-.]+\#[0-9]+|[0-9]+)\*\* : |\* ).+)$'
+  #local bad_lines=()
+
+  #local bad_lines
+  #bad_lines="$( \
+    #grep \
+      #--perl-regexp "${regex}" \
+      #--invert-match \
+      #"${change_file}" \
+    #)"
+
+  #if [[ -n "${bad_lines}" ]]; then
     #error "The following lines are not valid in ${BLUE}${change_file}${NC}:"
     #echo -e "--------------------------------------------------------------------------------"
-
-    #for bad_line in "${bad_lines[@]}"; do
-      #echo -e "${bad_line}"
-    #done
-
+    #echo -e "${bad_lines}"
     #echo -e "--------------------------------------------------------------------------------"
     #echo -e "Validation regex: ${BLUE}${regex}${NC}"
     #exit 1
   #fi
-}
+  ##while IFS= read -r line || [[ -n $line ]]; do
+    ##if [[ ! "${line}" =~ ${regex} ]]; then
+      ##debug_value "line" "${line}"
+      ##bad_lines+=( "${line}" )
+    ##fi
+  ##done < "${change_file}"
+
+  ##if [[ "${#bad_lines[@]}" -gt 0 ]]; then
+    ##error "The following lines are not valid in ${BLUE}${change_file}${NC}:"
+    ##echo -e "--------------------------------------------------------------------------------"
+
+    ##for bad_line in "${bad_lines[@]}"; do
+      ##echo -e "${bad_line}"
+    ##done
+
+    ##echo -e "--------------------------------------------------------------------------------"
+    ##echo -e "Validation regex: ${BLUE}${regex}${NC}"
+    ##exit 1
+  ##fi
+#}
 
 list_unreleased_changes() {
 
