@@ -113,6 +113,17 @@ Features:
 * Creates an annotated git tag using the release version number and change entries.
 
 
+## Dependencies
+
+Requires: 
+
+ * `bash` v4 or greater.
+ * GNU `grep`.
+ * GNU `sed`.
+
+If you have `jq` installed it will use that, else it will fall back on grep.
+
+
 ## Credits
 
 Credit for the idea of storing unreleased change log entries in separate files goes to:
