@@ -43,7 +43,7 @@ If you use the convention of including the issue number in your feature branch, 
 To get the latest version run this from the root of your git repository:
 
 ```bash
-wget -q --backups https://github.com/at055612/release-it/releases/latest/download/{log_change,tag_release}.sh && echo "Downloaded $(grep -o "Version: .*" tag_release.sh)"
+wget -q --backups https://github.com/at055612/release-it/releases/latest/download/{log_change,tag_release}.sh && chmod u+x {log_change,tag_release}.sh && echo "Downloaded $(grep -o "Version: .*" tag_release.sh)"
 ```
 
 ## The scripts
@@ -103,6 +103,8 @@ This script initiates a versioned release by updating the CHANGELOG and creating
 
 Features:
 
+* Creates its own configuration file on first use (if not found).
+* Creates an empty change log file on first use (if not found).
 * Adds the content of the unreleased change entry files (created by `log_change.sh`) to the CHANGELOG.
 * Guesses the next version based on the previous release.
 * Adds a new version heading to change log.

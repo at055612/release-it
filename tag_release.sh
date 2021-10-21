@@ -272,7 +272,7 @@ init_changelog_file() {
       echo -e "## [Unreleased]"
       echo -e 
       echo -e "~~~"
-      echo -e "DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh"
+      echo -e "DO NOT ADD CHANGES HERE - Add them using ${LOG_CHANGE_SCRIPT_NAME}, view them with './${LOG_CHANGE_SCRIPT_NAME} list'"
       echo -e "~~~"
       echo -e
       echo -e
