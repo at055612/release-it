@@ -12,6 +12,11 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.2.1] - 2021-10-21
+
+* Fix missing issue title when using auto mode
+
+
 ## [v0.2.0] - 2021-10-21
 
 * Fix change entry file validation
@@ -68,7 +73,8 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.2.0...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.2.1...master
+[v0.2.1]: https://github.com/at055612/release-it/compare/v0.2.0...v0.2.1
 [v0.2.0]: https://github.com/at055612/release-it/compare/v0.1.8...v0.2.0
 [v0.1.8]: https://github.com/at055612/release-it/compare/v0.1.7...v0.1.8
 [v0.1.7]: https://github.com/at055612/release-it/compare/v0.1.6...v0.1.7
