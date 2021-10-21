@@ -43,7 +43,7 @@ If you use the convention of including the issue number in your feature branch, 
 To get the latest version run this from the root of your git repository:
 
 ```bash
-wget -q --backups https://github.com/at055612/release-it/releases/latest/download/{log_change,tag_release}.sh && chmod u+x {log_change,tag_release}.sh && echo "Downloaded $(grep -o "Version: .*" tag_release.sh)"
+for f in log_change.sh tag_release.sh; do; curl -Lso $f https://github.com/at055612/release-it/releases/latest/download/$f && chmod u+x $f && echo "Downloaded $f $(grep -o "Version: .*" $f)"; done
 ```
 
 ## The scripts
