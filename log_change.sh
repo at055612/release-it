@@ -269,6 +269,8 @@ is_existing_change_file_present() {
 
     echo
     echo "Do you want to create a new change file for the issue or open an existing one?"
+    echo "If it is a different change tied to the same issue then you should create a new"
+    echo "file to avoid merge conflicts."
 
     # Build the menu options
     local menu_item_arr=()
