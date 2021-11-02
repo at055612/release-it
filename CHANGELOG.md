@@ -12,6 +12,15 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.2.2] - 2021-11-02
+
+* Change log_change.sh to use tag_release_config.env git namespace/repo values
+
+* Add issue link to change entry file
+
+* Change `list` entries to not be yellow.
+
+
 ## [v0.2.1] - 2021-10-21
 
 * Fix missing issue title when using auto mode
@@ -73,7 +82,8 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.2.1...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.2.2...master
+[v0.2.2]: https://github.com/at055612/release-it/compare/v0.2.1...v0.2.2
 [v0.2.1]: https://github.com/at055612/release-it/compare/v0.2.0...v0.2.1
 [v0.2.0]: https://github.com/at055612/release-it/compare/v0.1.8...v0.2.0
 [v0.1.8]: https://github.com/at055612/release-it/compare/v0.1.7...v0.1.8
