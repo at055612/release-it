@@ -757,7 +757,7 @@ parse_changelog() {
 
 create_config_file() {
   info "Config file ${BLUE}${tag_release_config_file}${GREEN} does not" \
-    "exist so it will be created"
+    "exist so it will be created."
 
   # 'EOF' quoted to avoid any expansion/substitution
   cat <<'EOF' > "${tag_release_config_file}"
@@ -766,9 +766,11 @@ create_config_file() {
 
 # shellcheck disable=2034
 {
-  # The namespace/usser on github, i.e. github.com/<namespace>
+  # The namespace/user on github, i.e. github.com/<namespace>
+  # This should be the upstream namespace, not a fork.
   GITHUB_NAMESPACE='gchq'
   # The name of the git repository on github
+  # This should be the upstream repo, not a fork.
   GITHUB_REPO='stroom-test-data'
 
   # Git tags should match this regex to be a release tag
@@ -809,7 +811,7 @@ EOF
   local namespace_and_repo=()
   IFS=" " read -r -a namespace_and_repo <<< "$( \
     git remote -v \
-      | grep "(fetch)" \
+      | grep "^origin.*(fetch)$" \
       | sed -r 's#.*[/:]([^/]+)/(.*)\.git \(fetch\)#\1 \2#')"
 
   debug "namespace_and_repo: ${namespace_and_repo[*]}"
@@ -841,7 +843,7 @@ EOF
   fi
 
   info "Confirm the values in the generated config file are appropriate, then" \
-    "commit them to git and then finally re-run this script."
+    "commit it to git."
 }
 
 scan_change_files() {
