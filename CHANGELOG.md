@@ -12,6 +12,11 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.4.0] - 2022-09-27
+
+* Add wrapping to 80 chars to `list` output.
+
+
 ## [v0.3.0] - 2021-11-04
 
 * Add looping to file validation.
@@ -94,7 +99,8 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.3.0...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.4.0...master
+[v0.4.0]: https://github.com/at055612/release-it/compare/v0.3.0...v0.4.0
 [v0.3.0]: https://github.com/at055612/release-it/compare/v0.2.3...v0.3.0
 [v0.2.3]: https://github.com/at055612/release-it/compare/v0.2.2...v0.2.3
 [v0.2.2]: https://github.com/at055612/release-it/compare/v0.2.1...v0.2.2
