@@ -17,6 +17,9 @@
 
 set -euo pipefail
 
+trap on_ctrl_c INT
+trap on_exit EXIT
+
 IS_DEBUG=${IS_DEBUG:-false}
 UNRELEASED_DIR_NAME="unreleased_changes"
 
@@ -49,6 +52,32 @@ ISSUE_LINE_TEXT_REGEX="^[A-Z].+\.$"
 
 # Lines starting with a word in the past tense
 PAST_TENSE_FIRST_WORD_REGEX='^(Add|Allow|Alter|Attempt|Chang|Copi|Correct|Creat|Disabl|Extend|Fix|Import|Improv|Increas|Inherit|Introduc|Limit|Mark|Migrat|Modifi|Mov|Preferr|Recognis|Reduc|Remov|Renam|Reorder|Replac|Restor|Revert|Stopp|Supersed|Switch|Turn|Updat|Upgrad)ed[^a-z]'
+
+on_ctrl_c () {
+  debug "on_ctrl_c()"
+  cleanup_on_error
+  exit 1
+}
+
+on_exit() {
+  exit_status=$?
+  debug_value "on_ctrl_c() - exit_status" "${exit_status}"
+  if [[ "${exit_status}" -ne 0 ]]; then
+    cleanup_on_error
+  fi
+  echo "Quitting" >&2
+  exit $exit_status
+}
+
+cleanup_on_error() {
+  debug "cleanup_on_error()"
+  if [[ -f "${new_file}" ]]; then
+    debug "Deleting created file ${new_file}"
+    rm "${new_file}" \
+      || echo "Unable to clean up file ${new_file}"
+    new_file=""
+  fi
+}
 
 setup_echo_colours() {
   # Exit the script on any error
@@ -88,6 +117,7 @@ error() {
 
 error_exit() {
   error "$@"
+  cleanup_on_error
   exit 1
 }
 
@@ -126,6 +156,7 @@ show_help_and_exit() {
   echo -e "E.g:   ${script_name} auto \"Fix nasty bug\"" >&2
   echo -e "E.g:   ${script_name} 0 \"Fix something without an issue number\"" >&2
   echo -e "E.g:   ${script_name} list" >&2
+  cleanup_on_error
   exit 1
 }
 
@@ -182,23 +213,23 @@ parse_git_issue() {
 
   local github_issue_api_url="https://api.github.com/repos/${issue_namespace}/${issue_repo}/issues/${issue_number}"
 
-  debug_value "github_issue_api_url" "${github_issue_api_url}"
+  debug_value "Calling GH using github_issue_api_url" "${github_issue_api_url}"
 
   local curl_return_code=0
   # Turn off exit on error so we can get the curl return code in the subshell
   set +e 
 
+  local response_json
+  response_json="$( \
+    curl \
+      --silent \
+      --fail \
+      "${github_issue_api_url}" \
+  )"
+  curl_return_code=$?
+
   if command -v jq >/dev/null 2>&1; then
     # jq is available so use it
-    local response_json
-    response_json="$( \
-      curl \
-        --silent \
-        --fail \
-        "${github_issue_api_url}" \
-    )"
-    curl_return_code=$?
-
     issue_title="$( \
       jq \
         --raw-output \
@@ -214,20 +245,18 @@ parse_git_issue() {
   else
     # No jq so fall back to grep, very dirty
     issue_title="$( \
-      curl \
-        --silent \
-        --fail \
-        "${github_issue_api_url}" \
-      | grep \
+      grep \
         --only-matching \
         --prl-regexp \
         '(?<="title": ").*(?=",)' \
+        <<< "${response_json}"
     )"
-    curl_return_code=$?
   fi
   set -e
 
   debug_value "curl_return_code" "${curl_return_code}"
+  debug_value "issue_title" "${issue_title}"
+  debug_value "issue_type" "${issue_type}"
 
   # curl_return_code is NOT the http status, just sucess/fail
   if [[ "${curl_return_code}" -ne 0 ]]; then
@@ -252,7 +281,9 @@ parse_git_issue() {
       issue_title=""
     fi
   else
-    info "Issue title: ${BLUE}${issue_title}${NC}"
+    info "Issue number: ${BLUE}${git_issue}${NC}"
+    info "Issue type:   ${BLUE}${issue_type}${NC}"
+    info "Issue title:  ${BLUE}${issue_title}${NC}"
   fi
 }
 
@@ -272,6 +303,7 @@ validate_change_text_arg() {
     echo -e "${YELLOW}${change_text}${NC}"
     echo -e "${DGREY}------------------------------------------------------------------------${NC}"
     echo -e "Validation regex: ${BLUE}${ISSUE_LINE_TEXT_REGEX}${NC}"
+    cleanup_on_error
     exit 1
   fi
 
@@ -281,6 +313,7 @@ validate_change_text_arg() {
     echo -e "${DGREY}------------------------------------------------------------------------${NC}"
     echo -e "${YELLOW}${change_text}${NC}"
     echo -e "${DGREY}------------------------------------------------------------------------${NC}"
+    cleanup_on_error
     exit 1
   fi
 }
@@ -495,7 +528,7 @@ write_change_entry() {
   # Use two underscores to help distinguish the date from the issue part
   # which may itself contain underscores.
   local filename="${date_str}__${git_issue_str}.md"
-  local change_file="${unreleased_dir}/${filename}"
+  change_file="${unreleased_dir}/${filename}"
 
   debug_value "change_file" "${change_file}"
 
@@ -562,7 +595,7 @@ write_change_entry() {
     echo "#"
     echo "#"
     echo "# Note: The line must start '* XXX ', where 'XXX' is a valid category,"
-    echo "#       one of [${change_categories[*]}]."
+    echo "#       one of [${CHANGE_CATEGORIES[*]}]."
     echo
     echo
     echo "# --------------------------------------------------------------------------------"
@@ -587,6 +620,8 @@ write_change_entry() {
   info "${YELLOW}${change_entry_line}${NC}"
   info "${DGREY}------------------------------------------------------------------------${NC}"
 
+  # Record the new file so we can delete it if the user bails out
+  new_file="${change_file}"
   echo -e "${all_content}" > "${change_file}"
 
   #if [[ -z "${change_text}" ]]; then
@@ -778,15 +813,15 @@ validate_bash_version() {
 }
 
 validate_env() {
-  if [[ -n "${GITHUB_NAMESPACE}" ]]; then
+  if [[ -z "${GITHUB_NAMESPACE}" ]]; then
     error_exit "Variable ${YELLOW}GITHUB_NAMESPACE${NC} must be set in the " \
       "${BLUE}${TAG_RELEASE_CONFIG_FILENAME}${NC} file."
   fi
-  if [[ -n "${GITHUB_REPO}" ]]; then
+  if [[ -z "${GITHUB_REPO}" ]]; then
     error_exit "Variable ${YELLOW}GITHUB_REPO${NC} must be set in the " \
       "${BLUE}${TAG_RELEASE_CONFIG_FILENAME}${NC} file."
   fi
-  if [[ -n "${CHANGE_CATEGORIES}" ]]; then
+  if [[ -z "${CHANGE_CATEGORIES}" ]]; then
     error_exit "Variable ${YELLOW}CHANGE_CATEGORIES${NC} must be set in the " \
       "${BLUE}${TAG_RELEASE_CONFIG_FILENAME}${NC} file."
   fi
@@ -799,7 +834,7 @@ validate_env() {
 build_categories_regex() {
   change_categories_regex="("
   local idx=0
-  for category in "${change_categories[@]}"; do
+  for category in "${CHANGE_CATEGORIES[@]}"; do
 
     if [[ "${idx}" -ne 0 ]]; then
       change_categories_regex+="|"
@@ -814,12 +849,12 @@ is_change_category() {
   local text="${1:-}"
   if [[ -z "${text}" ]]; then
     return 1
-  elif [[ ${#change_categories[@]} -eq 0 ]]; then
+  elif [[ ${#CHANGE_CATEGORIES[@]} -eq 0 ]]; then
     # Empty arr, no change categories
     return 1
   else
     local lower_text="${1,,}"
-    for category in "${change_categories[@]}"; do
+    for category in "${CHANGE_CATEGORIES[@]}"; do
       local lower_category="${category,,}"
       if [[ "${lower_text}" = "${lower_text}" ]]; then
         return 0
@@ -836,20 +871,20 @@ normalise_change_category() {
     error_exit "change_category is unset in call to normalise_change_category"
   fi
 
-  for category in "${change_categories[@]}"; do
+  for category in "${CHANGE_CATEGORIES[@]}"; do
     if [[ "${change_category,,}" = "${category,,}" ]]; then
       # Set it to the case from the env file
       change_category="${category}"
       return 0
     fi
-    error_exit "Category '${category}' not found in ${change_categories[*]}"
+    error_exit "Category '${category}' not found in ${CHANGE_CATEGORIES[*]}"
   done
 }
 
 # Make sure it has not been configured with any categories that
 # will get confused with other special args.
 validate_categories() {
-  for category in "${change_categories[@]}"; do
+  for category in "${CHANGE_CATEGORIES[@]}"; do
     local lower_category="${category,,}"
     if [[ "${lower_category}" =~ (list|edit|auto) ]]; then
       error_exit "'${category}' is a reserved word so cannot be used" \
@@ -861,6 +896,17 @@ validate_categories() {
 parse_args() {
   if [[ $# -eq 0 ]]; then
     mode="interactive"
+
+    # Try to extract the GH issue from the branch name
+    get_git_issue_from_branch
+
+    # If we are successful, then hit the api to get its details
+    # so we can infer the category
+    if [[ "${git_issue}" =~ $GIT_ISSUE_REGEX ]]; then
+      parse_git_issue "${git_issue}"
+    else
+      git_issue=""
+    fi
     return 0
   fi
 
@@ -892,7 +938,7 @@ parse_args() {
     else
       show_help_and_exit "Invalid arguments. Expecting the first argument" \
         "${BLUE}${change_category}${NC} to be a change " \
-        "category [${BLUE}${change_categories[*]}${NC}]."
+        "category [${BLUE}${CHANGE_CATEGORIES[*]}${NC}]."
     fi
   fi
 
@@ -959,7 +1005,7 @@ capture_category() {
     # Use FZF to get the category
     # Printf to convert space delim to line delim for FZF
     user_input="$( \
-      printf "%s\n" "${change_categories[@]}" \
+      printf "%s\n" "${CHANGE_CATEGORIES[@]}" \
         | fzf \
           --height ~40% \
           --border \
@@ -971,8 +1017,7 @@ capture_category() {
 
     if [[ -z "${user_input}" ]]; then
       # User must have done a ctrl-c
-      echo "No category selected, quitting." >&2
-      exit 1
+      error_exit "No category selected, quitting."
     else
       change_category="${user_input}"
     fi
@@ -980,7 +1025,7 @@ capture_category() {
     echo "${msg}"
     COLUMNS=1
     PS3="Select the category for this change:"
-    select user_input in "${change_categories[@]}"; do
+    select user_input in "${CHANGE_CATEGORIES[@]}"; do
       if [[ -n "${user_input}" ]]; then
         change_category="${user_input}"
         break
@@ -992,7 +1037,7 @@ capture_category() {
 # Prompt the user to get the category, issue and change text
 # depending on the mode
 prompt_user_for_remaining_args() {
-  if [[ "${mode}" != "edit" && -z "${change_category}" ]]; then
+  if [[ "${mode}" != "edit" && -z "${change_category:-}" ]]; then
     infer_category_from_issue_type
     if [[ -z "${change_category}" ]]; then
       capture_category
@@ -1012,7 +1057,7 @@ prompt_user_for_remaining_args() {
 # one of our categories, then use that category.
 infer_category_from_issue_type() {
   if [[ -n "${issue_type}" && -z "${change_category}" ]]; then
-    for category in "${change_categories[@]}"; do
+    for category in "${CHANGE_CATEGORIES[@]}"; do
       # ',,' to compare in  lower case
       if [[ "${issue_type,,}" = "${category,,}" ]]; then
         change_category="${category}"
@@ -1030,22 +1075,7 @@ check_for_fzf() {
   fi
 }
 
-main() {
-  #local SCRIPT_DIR
-  #SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-  #debug_value "SCRIPT_DIR" "${SCRIPT_DIR}"
-  local script_name="$0"
-  local has_fzf=false
-
-  setup_echo_colours
-  validate_bash_version
-  validate_env
-  validate_in_git_repo
-  check_for_fzf
-
-  local repo_root_dir
-  repo_root_dir="$(git rev-parse --show-toplevel)"
-
+source_env_file() {
   local tag_release_config_file="${repo_root_dir}/${TAG_RELEASE_CONFIG_FILENAME}"
   if [[ -f "${tag_release_config_file}" ]]; then
     # Source any repo specific config
@@ -1056,20 +1086,42 @@ main() {
       "doesn't exist. Run ${BLUE}./${TAG_RELEASE_SCRIPT_FILENAME}${NC}" \
       "to generate it."
   fi
+}
+
+main() {
+  #local SCRIPT_DIR
+  #SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+  #debug_value "SCRIPT_DIR" "${SCRIPT_DIR}"
+  local script_name="$0"
+  local has_fzf=false
+
+  setup_echo_colours
+  validate_bash_version
+
+  # Get the root of this git repo
+  local repo_root_dir
+  repo_root_dir="$(git rev-parse --show-toplevel)"
+
+  source_env_file
+  validate_env
+  validate_in_git_repo
+  check_for_fzf
 
   # Ensure change_categories is set to an empty arr if unset
-  local -a change_categories=${CHANGE_CATEGORIES:-( )}
+  #local -a change_categories=${CHANGE_CATEGORIES:-( )}
   local change_categories_regex
-  local change_category
-  local git_issue
-  local change_text
+  local change_category=""
+  local change_file=""
+  local git_issue=""
+  local change_text=""
   local mode="log"
   local issue_title=""
-  local issue_namespace
-  local issue_type
-  local issue_repo
-  local issue_number
+  local issue_namespace=""
+  local issue_type=""
+  local issue_repo=""
+  local issue_number=""
   local unreleased_dir="${repo_root_dir}/${UNRELEASED_DIR_NAME}"
+  local new_file=""
   mkdir -p "${unreleased_dir}"
 
   build_categories_regex
@@ -1077,9 +1129,10 @@ main() {
 
   debug_value "Parsed arguments" "$*"
   debug_value "mode" "${mode}"
-  debug_value "change_category" "${change_category}"
-  debug_value "git_issue" "${git_issue}"
-  debug_value "change_text" "${change_text}"
+  debug_value "CHANGE_CATEGORIES" "${CHANGE_CATEGORIES[*]}"
+  debug_value "change_category" "${change_category:-}"
+  debug_value "git_issue" "${git_issue:-}"
+  debug_value "change_text" "${change_text:-}"
   debug_value "GITHUB_NAMESPACE" "${GITHUB_NAMESPACE}"
   debug_value "GITHUB_REPO" "${GITHUB_REPO}"
 
@@ -1091,7 +1144,7 @@ main() {
     else
       edit_all_files
     fi
-  elif [[ "${mode}" = "log" ]]; then
+  elif [[ "${mode}" = "log" || "${mode}" = "interactive" ]]; then
     # Capture the category or git issue if required
     prompt_user_for_remaining_args
 
