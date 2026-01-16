@@ -145,6 +145,10 @@ ls -l
 set_version_and_date "./tag_release.sh"
 set_version_and_date "./log_change.sh"
 
+# Run shellcheck to spot any mistakes in the bash
+shellcheck "./tag_release.sh"
+shellcheck "./log_change.sh"
+
 # If it is a tagged build copy all the files needed for the github release
 # artefacts
 if [ -n "$BUILD_TAG" ]; then
