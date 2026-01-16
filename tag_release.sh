@@ -51,21 +51,21 @@
 #   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #   |## [Unreleased]
 #   |
-#   |* Fix typo
+#   |* Bug : Fix typo
 #   |
 #   |
 #   |## [v6.0-beta.29] - 2019-02-21
 #   |
-#   |* Change Travis build to generate sha256 hashes for release zip/jars.
+#   |* Refactor : Change Travis build to generate sha256 hashes for release zip/jars.
 #   |
-#   |* Uplift the visualisations content pack to v3.2.1
+#   |* Dependency : Uplift the visualisations content pack to v3.2.1
 #   |
-#   |* Issue **#1100** : Fix incorrect sort direction being sent to visualisations.
+#   |* Bug **#1100** : Fix incorrect sort direction being sent to visualisations.
 #   |
 #   |
 #   |## [v6.0-beta.28] - 2019-02-20
 #   |
-#   |* Add guard against race condition
+#   |* Bug : Add guard against race condition
 #   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # And have a section at the bottom like this:
@@ -163,6 +163,15 @@ debug() {
   # IS_DEBUG_ENABLED=true ./tag_release.sh
   if [ "${IS_DEBUG_ENABLED:-false}" = true ]; then
     echo -e "${DGREY}DEBUG: $*${NC}"
+  fi
+}
+
+debug_value() {
+  local name="$1"; shift
+  local value="$*"; shift
+  
+  if [ "${IS_DEBUG_ENABLED:-false}" = true ]; then
+    echo -e "${DGREY}DEBUG ${name}: [${value}]${NC}"
   fi
 }
 
@@ -380,6 +389,12 @@ apply_custom_validation() {
 validate_local_vs_remote() {
   local branch_name
   branch_name="$(git rev-parse --abbrev-ref HEAD)"
+  debug_value "branch_name" "${branch_name}"
+
+  if ! git ls-remote --exit-code --heads "${GIT_REMOTE_NAME}" "${branch_name}"; then
+    error_exit "Branch '${branch_name}' does not exist on remote '${GIT_REMOTE_NAME}'"
+  fi
+
 
   if ! git diff --quiet "${GIT_REMOTE_NAME}/${branch_name}"; then
 
@@ -431,7 +446,6 @@ determine_version_to_release() {
   if git tag | grep -q "^${determined_version}$"; then
     error_exit "${GREEN}The latest version in ${BLUE}${CHANGELOG_FILENAME}${GREEN}" \
       "[${BLUE}${determined_version}${GREEN}] has already been tagged in git.${NC}"
-    determined_version=
   fi
 
 
