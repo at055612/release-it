@@ -94,8 +94,7 @@ gather_release_artefacts() {
   done
 }
 
-set_version_and_date() {
-
+build_file() {
   local file="$1"; shift
 
   echo -e "${GREEN}Setting BUILD_VERSION to ${BLUE}${BUILD_VERSION}${GREEN}" \
@@ -103,12 +102,17 @@ set_version_and_date() {
   echo -e "${GREEN}Setting BUILD_DATE to ${BLUE}${BUILD_DATE}${GREEN}" \
     "in file ${BLUE}${file}${NC}"
 
+  # Bake the version/date into the file for the release asset
   sed \
     --in-place'' \
     --regexp-extended \
     --expression "s/<BUILD_VERSION>/${BUILD_VERSION}/" \
       --expression "s/<BUILD_DATE>/${BUILD_DATE}/" \
     "${file}"
+
+  # Run shellcheck at the end in case the above has also broken something
+  echo -e "${GREEN}Running shellcheck on file ${BLUE}${file}${NC}"
+  shellcheck "${file}"
 }
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -142,12 +146,8 @@ echo -e "git version:                   [${GREEN}$(git --version)${NC}]"
 
 ls -l
 
-set_version_and_date "./tag_release.sh"
-set_version_and_date "./log_change.sh"
-
-# Run shellcheck to spot any mistakes in the bash
-shellcheck "./tag_release.sh"
-shellcheck "./log_change.sh"
+build_file "./tag_release.sh"
+build_file "./log_change.sh"
 
 # If it is a tagged build copy all the files needed for the github release
 # artefacts
