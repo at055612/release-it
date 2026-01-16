@@ -46,8 +46,21 @@ To get the latest version run this from the root of your git repository:
 for f in log_change.sh tag_release.sh; do; curl -Lso $f https://github.com/at055612/release-it/releases/latest/download/$f && chmod u+x $f && echo "Downloaded $f $(grep -o "Version: .*" $f)"; done
 ```
 
-## The scripts
 
+## Dependencies
+
+* `bash` v4 or greater.
+* GNU `grep` is required.
+* GNU `sed` is required.
+* `log_change.sh` uses [fzf](https://junegunn.github.io/fzf/) for item selection if installed.
+  It works without `fzf` but it is not as nice a UX.
+* `log_change.sh` uses [jq](https://jqlang.org) for processing GitHub API responses.
+  Inferring change categories from issue types is not supported without `jq`.
+
+Installing both `fzf` and `jq` is recommended.
+
+
+## The scripts
 
 ### `log_change.sh`
 
@@ -59,41 +72,57 @@ Features:
   * Validates the issue number.
   * Writes the issue title to the change entry file.
   * Supports issues in different repositories.
-  * Can derive the issue number from branch name (e.g. branch `gh-nnn-` or `nnn-`).
+  * Can derive the issue number from branch name (e.g. branch `gh-nnn-` or `nnn-`), else prompts for it.
   * Multiple change files per issue.
+  * Tries to derive the change category from the GitHub issue type (if set), else prompts for it.
 * Creates simple change entries not linked to GitHub issues.
 * ISO 8601 dated filenames for implicit ordering and uniqueness.
+* Adds a block of random text to the file to make it unique for git's change detection algorithm.
 
 Examples:
 
 ```bash
-# Log a change for the issue number in your current branch (e.g. branch: gh-1234-fix-dead-locks)
-./log_change auto "Fix database dead locks during purge job"
+# Interactive mode. It will try to read the GitHub issue number from
+# your current branch (e.g. branch: gh-1234-fix-dead-locks).
+# It will also try to infer the change category from the GH issue type.
+# It will open your default editor to edit the change text in the created file.
+./log_change.sh
 
-# Log a change for the issue number in your current branch (e.g. branch: gh-1234-fix-dead-locks)
-# Your default editor will open the created skeleton change file
-./log_change auto
+# Log a change with no associated issue.
+# Prompts for change category and opens editor.
+./log_change.sh 0
+
+# Explicit type and text, will derive issue from branch.
+./log_change.sh Bug auto "Fix database dead locks during purge job"
 
 # Log a change with no associated issue
-./log_change 0 "Fix typo on about screen"
+./log_change.sh Bug 0 "Fix typo on about screen"
 
 # Log a change for issue #1234
-./log_change 1234 "Fix database dead locks during purge job"
+./log_change.sh Bug 1234 "Fix database dead locks during purge job"
 
 # Log a change for issue #1234
 # Your default editor will open the created skeleton change file
-./log_change 1234
+./log_change.sh 1234
 
 # Log a change for an issue in a different repository
-./log_change gchq/stroom#2424 "Fix database dead locks during purge job"
+./log_change.sh Bug gchq/stroom#2424 "Fix database dead locks during purge job"
 
 # Log a change for an issue in a different repository
 # Your default editor will open the created skeleton change file
-./log_change gchq/stroom#2424
+./log_change.sh Bug gchq/stroom#2424
 
 # List all unreleased changes
-./log_change list
+./log_change.sh list
 
+# Select a change file to edit from all available unreleased changes
+./log_change.sh edit
+
+# Edit the change file for the issue in your current branch (e.g. branch: gh-1234-fix-dead-locks)
+./log_change.sh edit auto
+
+# Show the help
+./log_change.sh help
 ```
 
 
@@ -111,17 +140,6 @@ Features:
 * Adds/updates the version compare links in the CHANGELOG.
 * Commits and pushes the change log changes.
 * Creates an annotated git tag using the release version number and change entries.
-
-
-## Dependencies
-
-Requires: 
-
- * `bash` v4 or greater.
- * GNU `grep`.
- * GNU `sed`.
-
-If you have `jq` installed it will use that, else it will fall back on grep.
 
 
 ## Credits
