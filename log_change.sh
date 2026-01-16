@@ -965,15 +965,18 @@ normalise_change_category() {
   if [[ -z "${change_category}" ]]; then
     error_exit "change_category is unset in call to normalise_change_category"
   fi
+  debug_value "change_category" "${change_category}"
 
   for category in "${CHANGE_CATEGORIES[@]}"; do
+    debug_value "category" "${category}"
     if [[ "${change_category,,}" = "${category,,}" ]]; then
       # Set it to the case from the env file
       change_category="${category}"
       return 0
     fi
-    error_exit "Category '${category}' not found in ${CHANGE_CATEGORIES[*]}"
   done
+  # If we get here, it wasn't found.
+  error_exit "Category '${change_category}' not found in [${CHANGE_CATEGORIES[*]}]"
 }
 
 # Make sure it has not been configured with any categories that
