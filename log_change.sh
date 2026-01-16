@@ -13,6 +13,12 @@
 # Change log entries are stored in files in <repo_root>/unreleased_changes
 # This script is used in conjunction with tag_release.sh which adds the
 # change entries to the CHANGELOG at release time.
+#
+# The user experience is much better if fzf and jq are installed.
+# The following variables can be set for testing:
+#   IS_DEBUG=true ./log_change.sh ...... # Debug logging
+#   DISABLE_FZF=true ./log_change.sh ...... # Pretends fzf is not present
+#   DISABLE_JQ=true ./log_change.sh ...... # Pretends jq is not present
 ##########################################################################
 
 set -euo pipefail
@@ -20,35 +26,24 @@ set -euo pipefail
 trap on_ctrl_c INT
 trap on_exit EXIT
 
-IS_DEBUG=${IS_DEBUG:-false}
 UNRELEASED_DIR_NAME="unreleased_changes"
 
 # File containing the configuration values for this script
 TAG_RELEASE_CONFIG_FILENAME='tag_release_config.env'
 TAG_RELEASE_SCRIPT_FILENAME='tag_release.sh'
-
-# e.g
-# * Fix bug
-# Used to look for lines that might be a change entry
-#ISSUE_LINE_SIMPLE_PREFIX_REGEX="^\* [A-Z]"
+ISSUE_HASH_PREFIX="#"
 
 # e.g.
 # * Issue **#1234** : 
 # * Issue **gchq/stroom-resources#104** : 
 # https://regex101.com/r/VcvbFV/1
-#ISSUE_LINE_NUMBERED_PREFIX_REGEX="^\* Issue \*\*([a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-.]+\#[0-9]+|#[0-9]+)\*\* : "
 ISSUE_LINE_REGEX_NUMBER_PART="\*\*([a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-.]+\#[0-9]+|#[0-9]+)\*\*"
-
-ISSUE_LINE_REGEX_PREFIX="^\* "
 
 # e.g.
 # 1234
 # my-namespace/my-repor#1234
 # foo/bar#1234
 GIT_ISSUE_REGEX="^(([_.a-zA-Z0-9-]+\/[_.a-zA-Z0-9-]+\#)?[1-9][0-9]*)$"
-
-# https://regex101.com/r/Pgvckt/1
-ISSUE_LINE_TEXT_REGEX="^[A-Z].+\.$"
 
 # Lines starting with a word in the past tense
 PAST_TENSE_FIRST_WORD_REGEX='^(Add|Allow|Alter|Attempt|Chang|Copi|Correct|Creat|Disabl|Extend|Fix|Import|Improv|Increas|Inherit|Introduc|Limit|Mark|Migrat|Modifi|Mov|Preferr|Recognis|Reduc|Remov|Renam|Reorder|Replac|Restor|Revert|Stopp|Supersed|Switch|Turn|Updat|Upgrad)ed[^a-z]'
@@ -65,17 +60,19 @@ on_exit() {
   if [[ "${exit_status}" -ne 0 ]]; then
     cleanup_on_error
   fi
-  echo "Quitting" >&2
+  #echo "Quitting" >&2
+  debug "on_ctrl_c() - Quitting"
   exit $exit_status
 }
 
 cleanup_on_error() {
   debug "cleanup_on_error()"
-  if [[ -f "${new_file}" ]]; then
-    debug "Deleting created file ${new_file}"
-    rm "${new_file}" \
-      || echo "Unable to clean up file ${new_file}"
-    new_file=""
+  local file="${temp_file:-}"
+  if [[ -n "${file}" && -f "${file}" ]]; then
+    debug "Deleting file ${file}"
+    rm "${file}" \
+      || error "Unable to delete file ${file}"
+    temp_file=""
   fi
 }
 
@@ -123,41 +120,65 @@ error_exit() {
 
 debug_value() {
   local name="$1"; shift
-  local value="$1"; shift
+  local value="$*"; shift
   
-  if [ "${IS_DEBUG}" = true ]; then
+  if [ "${IS_DEBUG:-false}" = true ]; then
     echo -e "${DGREY}DEBUG ${name}: [${value}]${NC}"
   fi
 }
 
 debug() {
-  local str="$1"; shift
-  
-  if [ "${IS_DEBUG}" = true ]; then
-    echo -e "${DGREY}DEBUG ${str}${NC}"
+  local msg="$*"; shift
+  if [ "${IS_DEBUG:-false}" = true ]; then
+    echo -e "${DGREY}DEBUG ${msg}${NC}"
   fi
 }
 
 show_help_and_exit() {
-  local msg="${1:-Invalid arguments}"
-  error "${msg}"
-  echo -e "Usage: ${script_name} github_issue [change_text]" >&2
-  echo -e "git_issue - GitHub issue number in one of the following formats:" >&2
-  echo -e "            0 - No issue exists for this change" >&2
-  echo -e "            n - Just the issue number." >&2
-  echo -e "            namespace/repo#n - Issue number on another repo." >&2
-  echo -e "            auto - Will derive the issue number from the current branch." >&2
-  echo -e "            list - List all unreleased issues." >&2
-  echo -e "change_text - The change text in github markdown format. This will be appended to" >&2
-  echo -e "              change log entry" >&2
-  echo -e "E.g:   ${script_name} 1234 \"Fix nasty bug\"" >&2
-  echo -e "E.g:   ${script_name} gchq/stroom#1234 \"Fix nasty bug\"" >&2
-  echo -e "E.g:   ${script_name} 1234" >&2
-  echo -e "E.g:   ${script_name} auto \"Fix nasty bug\"" >&2
-  echo -e "E.g:   ${script_name} 0 \"Fix something without an issue number\"" >&2
-  echo -e "E.g:   ${script_name} list" >&2
+  local msgs=()
+  if [[ $# -eq 0 ]]; then
+    msgs=( "Invalid arguments" )
+  else
+    msgs=( "$@" )
+  fi
+
+  debug_value "msgs" "${msgs[@]}"
+  error "${msgs[@]}"
+  echo -e -n "${DGREY}"
+  show_help
+  echo -e -n "${NC}"
   cleanup_on_error
   exit 1
+}
+
+show_help() {
+  echo -e "log_change.sh creates/edits change entry files for unreleased changes." >&2
+  echo -e "Usage: ${script_name} [command] [category] [github_issue] [change_text]" >&2
+  echo -e "command     - One of: [help list edit link]:" >&2
+  echo -e "              help: Show this help" >&2
+  echo -e "              list: List all unreleased changes." >&2
+  echo -e "              edit: Edit an existing change entry file." >&2
+  echo -e "              link: Open an issue in Github." >&2
+  echo -e "category    - The change category, one of [${CHANGE_CATEGORIES[*]}]" >&2
+  echo -e "git_issue   - GitHub issue number in one of the following formats:" >&2
+  echo -e "              0 - No issue exists for this change" >&2
+  echo -e "              n - Just the issue number." >&2
+  echo -e "              namespace/repo#n - Issue number on another repo." >&2
+  echo -e "              auto - Will derive the issue number from the current branch." >&2
+  echo -e "change_text - The change text in github markdown format. This will be appended to" >&2
+  echo -e "              change log entry" >&2
+  echo -e "If no arguments are supplied it will try to derive the issue number" >&2
+  echo -e "from the current branch name and obtain the category from the GitHub issue." >&2
+
+  echo -e "E.g: ${script_name}   # Fully interactive mode" >&2
+  echo -e "E.g: ${script_name} Bug 1234 \"Fix nasty bug\"" >&2
+  echo -e "E.g: ${script_name} Bug gchq/stroom#1234 \"Fix nasty bug\"" >&2
+  echo -e "E.g: ${script_name} 1234" >&2
+  echo -e "E.g: ${script_name} Bug auto \"Fix nasty bug\"" >&2
+  echo -e "E.g: ${script_name} Bug 0 \"Fix something without an issue number\"" >&2
+  echo -e "E.g: ${script_name} list" >&2
+  echo -e "E.g: ${script_name} edit" >&2
+  echo -e "E.g: ${script_name} edit auto" >&2
 }
 
 # Parse the git issue number from the branch into git_issue variable,
@@ -191,25 +212,33 @@ get_git_issue_from_branch() {
 parse_git_issue() {
   local git_issue="$1";
   debug_value "git_issue" "${git_issue}"
+  if [[ -n "${git_issue}" ]]; then
+    if [[ "${git_issue}" =~ ^[1-9][0-9]*$ ]]; then
+      # Issue in this repo so use the values we got from the local repo
+      issue_namespace="${GITHUB_NAMESPACE}"
+      issue_repo="${GITHUB_REPO}"
+      issue_number="${git_issue}"
+    else
+      # Fully qualified issue so extract the parts by replacing / and # with
+      # space then reading into an array which will split on space
+      local parts=()
+      IFS=" " read -r -a parts <<< "${git_issue//[\#\/]/ }"
+      issue_namespace="${parts[0]}"
+      issue_repo="${parts[1]}"
+      issue_number="${parts[2]}"
+    fi
 
-  if [[ "${git_issue}" =~ ^[1-9][0-9]*$ ]]; then
-    # Issue in this repo so use the values we got from the local repo
-    issue_namespace="${GITHUB_NAMESPACE}"
-    issue_repo="${GITHUB_REPO}"
-    issue_number="${git_issue}"
-  else
-    # Fully qualified issue so extract the parts by replacing / and # with
-    # space then reading into an array which will split on space
-    local parts=()
-    IFS=" " read -r -a parts <<< "${git_issue//[\#\/]/ }"
-    issue_namespace="${parts[0]}"
-    issue_repo="${parts[1]}"
-    issue_number="${parts[2]}"
+    debug_value "issue_namespace" "${issue_namespace}"
+    debug_value "issue_repo" "${issue_repo}"
+    debug_value "issue_number" "${issue_number}"
   fi
+}
 
-  debug_value "issue_namespace" "${issue_namespace}"
-  debug_value "issue_repo" "${issue_repo}"
-  debug_value "issue_number" "${issue_number}"
+fetch_git_issue_info() {
+  local git_issue="$1";
+  debug_value "git_issue" "${git_issue}"
+
+  parse_git_issue "${git_issue}"
 
   local github_issue_api_url="https://api.github.com/repos/${issue_namespace}/${issue_repo}/issues/${issue_number}"
 
@@ -228,18 +257,26 @@ parse_git_issue() {
   )"
   curl_return_code=$?
 
-  if command -v jq >/dev/null 2>&1; then
+  if [[ "${has_jq}" = true ]]; then
     # jq is available so use it
+    # '// empty' ensure we get an empty string back if not found, rather than
+    # 'null', see https://jqlang.org/manual/#alternative-operator
     issue_title="$( \
       jq \
         --raw-output \
-        '.title' \
+        '.title // empty' \
         <<< "${response_json}"
     )"
     issue_type="$( \
       jq \
         --raw-output \
-        '.type.name' \
+        '.type.name // empty' \
+        <<< "${response_json}"
+    )"
+    issue_tags="$( \
+      jq \
+        --raw-output \
+        '[.labels[].name] | sort | join(", ") // empty' \
         <<< "${response_json}"
     )"
   else
@@ -257,6 +294,14 @@ parse_git_issue() {
   debug_value "curl_return_code" "${curl_return_code}"
   debug_value "issue_title" "${issue_title}"
   debug_value "issue_type" "${issue_type}"
+  debug_value "issue_tags" "${issue_tags}"
+
+  if [[ -n "${change_category_from_arg}" && -n "${issue_type}" ]]; then
+    if [[ "${change_category_from_arg}" != "${issue_type}" ]]; then
+      error_exit "The provided change category ${BLUE}${change_category_from_arg}${NC}" \
+        "does not match the issue type ${BLUE}${issue_type}${NC} of issue ${BLUE}${git_issue}${NC}."
+    fi
+  fi
 
   # curl_return_code is NOT the http status, just sucess/fail
   if [[ "${curl_return_code}" -ne 0 ]]; then
@@ -284,6 +329,7 @@ parse_git_issue() {
     info "Issue number: ${BLUE}${git_issue}${NC}"
     info "Issue type:   ${BLUE}${issue_type}${NC}"
     info "Issue title:  ${BLUE}${issue_title}${NC}"
+    info "Issue tags:   ${BLUE}${issue_tags}${NC}"
   fi
 }
 
@@ -294,28 +340,28 @@ validate_in_git_repo() {
   fi
 }
 
-validate_change_text_arg() {
+# Return a 0 status if valid
+is_validate_change_text() {
   local change_text="$1"; shift
 
-  if ! grep --quiet --perl-regexp "${ISSUE_LINE_TEXT_REGEX}" <<< "${change_text}"; then
-    error "The change entry text is not valid"
+  if [[ ! "${change_text}" =~ ^[A-Z].*\.$ ]]; then
+    error "The change entry text must start with a capital letter and end with a full stop."
     echo -e "${DGREY}------------------------------------------------------------------------${NC}"
     echo -e "${YELLOW}${change_text}${NC}"
     echo -e "${DGREY}------------------------------------------------------------------------${NC}"
-    echo -e "Validation regex: ${BLUE}${ISSUE_LINE_TEXT_REGEX}${NC}"
-    cleanup_on_error
-    exit 1
+    return 1
   fi
 
   if ! validate_tense "${change_text}"; then
     error "The change entry text should be in the imperitive mood" \
-      "\ni.e. \"Fix nasty bug\" rather than \"Fixed nasty bug\""
+      "\ni.e. \"Fix nasty bug\" rather than \"Fixed nasty bug\"."
     echo -e "${DGREY}------------------------------------------------------------------------${NC}"
     echo -e "${YELLOW}${change_text}${NC}"
     echo -e "${DGREY}------------------------------------------------------------------------${NC}"
-    cleanup_on_error
-    exit 1
+    return 1
   fi
+
+  return 0
 }
 
 validate_tense() {
@@ -324,48 +370,58 @@ validate_tense() {
   debug_value "change_text" "${change_text}"
 
   if [[ "${IS_TENSE_VALIDATED:-true}" = true ]]; then
-    if echo "${change_text}" | grep --quiet --perl-regexp "${PAST_TENSE_FIRST_WORD_REGEX}"; then
+    if [[ "${change_text}" =~ ${PAST_TENSE_FIRST_WORD_REGEX} ]]; then
       debug "Found past tense first word"
       return 1
     else
       debug "Tense validated ok"
-      return 0
     fi
   else
     debug "Tense validation disabled"
-    return 0
   fi
+  return 0
 }
 
 select_file_from_list() {
   local file_list=( "$@" );
-  
-  info "Change file(s) already exist for this issue:"
-  echo
 
-  list_unreleased_changes "${git_issue_str}"
-
-  echo
-  echo "Do you want to create a new change file for the issue or open an existing one?"
-  echo "If it is a different change tied to the same issue then you should create a new"
-  echo "file to avoid merge conflicts."
+  # No point listing them if user has fzf, as it can show the preview
+  if [[ "${has_fzf}" = false ]]; then
+    list_unreleased_changes "${git_issue_str:-}"
+    echo
+  fi
 
   # Build the menu options
   local menu_item_arr=()
+  local open_prefix=""
   if [[ "${mode}" != "edit" ]]; then
+    echo "Do you want to create a new change file for the issue or open an existing one?"
+    echo "If it is a different change tied to the same issue then you should create a new"
+    echo "file to avoid merge conflicts."
+
     menu_item_arr+=( "Create new file" )
+    open_prefix="Open "
   fi
 
   for filename in "${file_list[@]}"; do
-    menu_item_arr+=( "Open ${filename}" )
+    menu_item_arr+=( "${open_prefix}${filename}" )
   done
 
-  local msg="Select the change file to open:"
-
   if [[ "${has_fzf}" = true ]]; then
-    echo "${msg}"
 
-    user_input="$( \
+    local fzf_header
+    if [[ "${mode}" != "edit" ]]; then
+      fzf_header="Select the action you want to perform: (CTRL-c or ESC to quit)"
+    else
+      fzf_header="Select the change file to open: (CTRL-c or ESC to quit)"
+    fi
+
+    # Do the -f test to handle the 'Create new file' entry
+    local fzf_preview_cmd="file={}; file=\"${unreleased_dir}/\${file#Open }\"; [[ -f \"\${file}\" ]] && head -n1 \"\${file}\""
+    debug_value "fzf_preview_cmd" "${fzf_preview_cmd}"
+
+    # Show the top line of the file in the preview pane
+    if ! user_input="$( \
       printf "%s\n" "${menu_item_arr[@]}" \
         | fzf \
           --height ~40% \
@@ -373,12 +429,23 @@ select_file_from_list() {
           --raw  \
           --bind result:best \
           --bind enter:accept-non-empty \
-          --header="${msg} (CTRL-c or ESC to quit)" \
-    )"
+          --header="${fzf_header}" \
+          --preview "${fzf_preview_cmd}" \
+          --preview-window "wrap" \
+          --preview-label "Change entry" \
+    )"; then
+      cleanup_on_error
+      exit 1
+    fi
+
   else
     # Present the user with a menu of options in a single column
     COLUMNS=1
-    PS3="Select the change file:"
+    if [[ "${mode}" != "edit" ]]; then
+      PS3="Enter the number of the action you want to perform:"
+    else
+      PS3="Enter the number of the file you want to edit:"
+    fi
     select user_input in "${menu_item_arr[@]}"; do
       if [[ -n "${user_input}" ]]; then
         break
@@ -395,10 +462,11 @@ select_file_from_list() {
     if [[ -z "${change_text}" ]]; then
       open_file_in_editor "${change_file}" "${git_issue}"
     fi
-  elif [[ "${user_input}" =~ ^Open ]]; then
+  elif [[ "${user_input}" =~ ^${open_prefix} ]]; then
     local chosen_file_name="${user_input#Open }"
     local chosen_file="${unreleased_dir}/${chosen_file_name}"
     debug_value "chosen_file_name" "${chosen_file_name}"
+    debug_value "chosen_file" "${chosen_file}"
     if [[ -z "${git_issue}" ]]; then
       # If we have come here via the edit mode, then we may not have
       # a git_issue, so try to get it from the file/filename
@@ -411,36 +479,55 @@ select_file_from_list() {
 }
 
 read_git_issue_from_change_file() {
+  debug_value "read_git_issue_from_change_file()" "${@}"
   local file="$1"; shift
   if [[ ! -f "${file}" ]]; then
     error_exit "File ${file} not found."
   fi
 
-  # This regex needs to look for the line added in write_change_entry()
-  # Examples:
-  # # Issue number: 1234
-  # # Issue number: some-user/some-repo#1234
-  git_issue="$( \
-    grep \
-      --only-matching \
-      --perl-regexp \
-      '(?<=^# Issue number: )([a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-.]+\#[0-9]+|[0-9]+)$' \
-      "${file}" \
-  )"
-  
-  # In case this is an old change file without the '# Issue number:' line
-  # attempt to get it from the filename
-  if [[ -z "${git_issue}" ]]; then
-    local filename; filename="$(basename "${existing_file}" )"
+  if [[ "${file}" =~ __0.md$ ]]; then
+    # No associated issue
+    git_issue=0
+    debug "No associated issue, setting git_issue to 0"
+  else
+    # This regex needs to look for the line added in write_change_entry()
+    # Examples:
+    # # Issue number: 1234
+    # # Issue number: some-user/some-repo#1234
     git_issue="$( \
       grep \
         --only-matching \
         --perl-regexp \
-        '(?<=__)[0-9]+(?=\.md)' \
-        <<< "${filename}" \
+        '(?<=^# Issue number: )([a-zA-Z0-9_\-.]+\/[a-zA-Z0-9_\-.]+\#[0-9]+|[0-9]+)$' \
+        "${file}" \
+        || true
     )"
+    debug_value "git_issue" "${git_issue}"
+
+    
+    # In case this is an old change file without the '# Issue number:' line
+    # attempt to get it from the change entry line
     if [[ -z "${git_issue}" ]]; then
-      error_exit "Unable to extract git_issue from file ${file}".
+      local change_entry_line
+      change_entry_line="$( head -n 1 "${file}" )"
+      debug_value "change_entry_line" "${change_entry_line}"
+      if [[ -n "${change_entry_line}" ]]; then
+        # Examples:
+        # * XXXXX : Fix bug with...
+        # * XXXXX **#456** : Fix bug with...
+        # * XXXXX **namespace/other-repo#456** : Fix bug with...
+        local pattern='^\* [^\*]+ \*{2}([^\*]+)\*\*'
+        if [[ "${change_entry_line}" =~ ${pattern} ]]; then
+          git_issue="${BASH_REMATCH[1]}"
+          # '#1234' => '1234'
+          git_issue="${git_issue#"${ISSUE_HASH_PREFIX}"}"
+          debug_value "git_issue" "${git_issue}"
+        fi
+      fi
+
+      if [[ -z "${git_issue}" ]]; then
+        error_exit "Unable to extract git_issue from file ${file}".
+      fi
     fi
   fi
 }
@@ -472,6 +559,8 @@ edit_change_file_if_present() {
     debug "File does not exist"
     return 1
   else 
+    info "Change file(s) already exist for this issue:"
+    echo
     select_file_from_list "${existing_files[@]}"
     return 0
   fi
@@ -528,13 +617,16 @@ write_change_entry() {
   # Use two underscores to help distinguish the date from the issue part
   # which may itself contain underscores.
   local filename="${date_str}__${git_issue_str}.md"
-  change_file="${unreleased_dir}/${filename}"
+  # Will make a file like /tmp/<date part>__<git issue part>.md.QkL5v43Cx1
+  temp_file="$( mktemp -t "${filename}.XXXXXXXXXX" )"
+  # set change_file so the rest of the script can work on this temp file
+  change_file="${temp_file}"
+  # Record what we want the ultimate new file to be if successful
+  new_file="${unreleased_dir}/${filename}"
 
+  debug_value "temp_file" "${temp_file}"
   debug_value "change_file" "${change_file}"
-
-  if [[ -e "${change_file}" ]]; then
-    error_exit "File ${BLUE}${change_file}${NC} already exists"
-  fi
+  debug_value "new_file" "${new_file}"
 
   local line_prefix="* "
   local category_part="${change_category}"
@@ -557,7 +649,8 @@ write_change_entry() {
     issue_part="${issue_prefix}${git_issue}${issue_suffix} : "
   fi
 
-  local change_entry_line="${line_prefix}${category_part} ${issue_part}${change_text}"
+  local empty_change_text="< Enter the change entry description here >."
+  local change_entry_line="${line_prefix}${category_part} ${issue_part}${change_text:-"${empty_change_text}"}"
   local all_content
 
   # Craft the content of the file
@@ -572,6 +665,7 @@ write_change_entry() {
       echo "# ********************************************************************************"
       echo "# Issue number: ${git_issue}"
       echo "# Issue title:  ${issue_title}"
+      echo "# Issue tags:   ${issue_tags}"
       echo "# Issue link:   ${github_issue_url}"
       echo "# ********************************************************************************"
       echo
@@ -615,14 +709,10 @@ write_change_entry() {
     echo '```'
   )"
 
-  info "Writing file ${BLUE}${change_file}${GREEN}:"
-  info "${DGREY}------------------------------------------------------------------------${NC}"
-  info "${YELLOW}${change_entry_line}${NC}"
-  info "${DGREY}------------------------------------------------------------------------${NC}"
+  debug_value "change_file" "${change_file}"
+  debug_value "change_entry_line" "${change_entry_line}"
 
-  # Record the new file so we can delete it if the user bails out
-  new_file="${change_file}"
-  echo -e "${all_content}" > "${change_file}"
+  echo -e "${all_content}" > "${temp_file}"
 
   #if [[ -z "${change_text}" ]]; then
     #open_file_in_editor "${change_file}" "${git_issue}"
@@ -636,6 +726,7 @@ open_file_in_editor() {
   
   local editor
   editor="${VISUAL:-${EDITOR:-vi}}"
+  debug_value "editor" "${editor}"
 
   local is_first_pass=true
 
@@ -646,7 +737,7 @@ open_file_in_editor() {
     if [[ "${is_first_pass}" = true ]]; then
       read -n 1 -s -r -p "Press any key to open the file"
     else
-      read -n 1 -s -r -p "Press any key to re-open the file"
+      read -n 1 -s -r -p "File failed validation. Press any key to re-open the file or CTRL-c to quit"
       # Extra line break for subsequent passes to separate them
       echo
     fi
@@ -666,6 +757,24 @@ open_file_in_editor() {
   done
 }
 
+get_line_count_by_regex() {
+  local change_file="$1"; shift
+  local regex="$1"; shift
+  if [[ -z "${regex}" ]]; then
+    error_exit "regex argument not set"
+  fi
+
+  match_count="$( \
+    grep \
+      --count \
+      --perl-regexp \
+      "${regex}" \
+      "${change_file}" \
+    || true
+    )"
+  match_count="${match_count:-0}"
+}
+
 validate_issue_line_in_file() {
   debug "validate_issue_line_in_file ($*)"
   local change_file="$1"; shift
@@ -674,82 +783,74 @@ validate_issue_line_in_file() {
   debug "Validating file ${change_file}"
   debug_value "git_issue" "${git_issue}"
 
+  # Example change lines:
   # * Bug **#1234** : Some text
   # * Feature **#1234** : Some text
   # * Feature **user/repo#1234** : Some text
   # * Refactor : Some text
 
-  local issue_line_prefix_regex
-  issue_line_prefix_regex+="${ISSUE_LINE_REGEX_PREFIX}"
-  issue_line_prefix_regex+="${change_categories_regex} "
-  if [[ "${git_issue}" = "0" ]]; then
-    #issue_line_prefix_regex="${ISSUE_LINE_SIMPLE_PREFIX_REGEX}"
-    issue_line_prefix_regex+=": "
-  else
-    #issue_line_prefix_regex="${ISSUE_LINE_NUMBERED_PREFIX_REGEX}"
-    issue_line_prefix_regex+="${ISSUE_LINE_REGEX_NUMBER_PART} : "
+  local match_count
+  get_line_count_by_regex "${change_file}" "^\*"
+  if [[ "${match_count}" -gt 1 ]]; then
+    error "Found multiple lines starting with '*'." \
+      "Only the top line should start with a '*'."
+    return 1
+  elif [[ "${match_count}" -eq 0 ]]; then
+    error "No change entry line found could be found."
+    return 1
   fi
-  # Change text should start with a capital
-  issue_line_prefix_regex+="[A-Z]"
-  debug_value "issue_line_prefix_regex" "${issue_line_prefix_regex}"
 
-  local issue_line_count
-  issue_line_count="$( \
-    grep \
-      --count \
-      --perl-regexp \
-      "${issue_line_prefix_regex}" \
-      "${change_file}" \
-    || true
-    )"
+  local issue_line; issue_line="$( \
+    head -n 1 "${change_file}" \
+  )"
+  debug_value "issue_line" "${issue_line}"
 
-  debug_value "issue_line_count" "${issue_line_count}"
-
-  if [[ "${issue_line_count}" -eq 0 ]]; then
-    error "No change entry line found in ${BLUE}${change_file}${NC}"
-    echo -e "Line prefix regex: ${BLUE}${issue_line_prefix_regex}${NC}"
+  if [[ -z "${issue_line}" ]]; then
+    error "The top line of the the file is empty. It much contain the change entry."
     return 1
-  elif [[ "${issue_line_count}" -gt 1 ]]; then
-    local matching_change_lines
-    matching_change_lines="$(grep --perl-regexp "${issue_line_prefix_regex}" "${change_file}" )"
-    error "More than one entry lines found in ${BLUE}${change_file}${NC}:"
-    echo -e "${DGREY}------------------------------------------------------------------------${NC}"
-    echo -e "${YELLOW}${matching_change_lines}${NC}"
-    echo -e "${DGREY}------------------------------------------------------------------------${NC}"
-    echo -e "Line prefix regex: ${BLUE}${issue_line_prefix_regex}${NC}"
+  fi
+  if [[ ! "${issue_line}" =~ ^\* ]]; then
+    error "The top line of the the file must be the change entry and start with '* '."
     return 1
+  fi
+
+  # Bash regex can't do non-capturing groups so we have to have two capturing
+  # groups for the issue part.
+  local split_pattern='^\* ([^ ]+) (([^\ ]+) )?: (.*)$'
+  # * <category> <issue with markdown> : <change text>
+  if [[ "${issue_line}" =~ ${split_pattern} ]]; then
+    local part_count="${#BASH_REMATCH[@]}"
+    debug_value "part_count" "${part_count}"
+
+    local category_part="${BASH_REMATCH[1]}"
+    local text_part="${BASH_REMATCH[-1]}" # Always last part
+    debug_value "category_part" "${category_part}"
+    debug_value "text_part" "${text_part}"
+
+    if ! is_change_category "${category_part}" true; then
+      error "Category '${category_part}' must match one of [${CHANGE_CATEGORIES[*]}]."
+      return 1
+    fi
+
+    if [[ "${part_count}" -eq 4 ]]; then
+      # Group 2 includes the space which we don't want
+      local issue_part="${BASH_REMATCH[3]}"
+      debug_value "issue_part" "${issue_part}"
+
+      if [[ ! "${issue_part}" =~ ${ISSUE_LINE_REGEX_NUMBER_PART} ]]; then
+        error "The GitHub issue part '${issue_part}' (if applicable) must be of the form:"
+        error "  **#123**"
+        error "  **namespace/other-repo#456**"
+        return 1
+      fi
+    fi
+
+    if ! is_validate_change_text "${text_part}"; then
+      return 1
+    fi
   else
-    # Found one issue line which should be on the top line so validate it
-    local issue_line
-    issue_line="$(head -n1 "${change_file}")"
-
-    # Line should look like one of
-    # * Bug : Fix something.
-    # * Bug **#1234** : Fix something.
-    # * Feature **gchq/stroom-resources#104** : Change something.
-    # Delete the prefix part
-    local issue_line_text="${issue_line#*: }"
-
-    debug_value "issue_line" "${issue_line}"
-    debug_value "issue_line_text" "${issue_line_text}"
-
-    if ! echo "${issue_line_text}" | grep --quiet --perl-regexp "${ISSUE_LINE_TEXT_REGEX}"; then
-      error "The change entry text is not valid in ${BLUE}${change_file}${NC}:"
-      echo -e "${DGREY}------------------------------------------------------------------------${NC}"
-      echo -e "${YELLOW}${issue_line_text}${NC}"
-      echo -e "${DGREY}------------------------------------------------------------------------${NC}"
-      echo -e "Validation regex: ${BLUE}${ISSUE_LINE_TEXT_REGEX}${NC}"
-      return 1
-    fi
-
-    if ! validate_tense "${issue_line_text}"; then
-      error "The change entry text should be in the imperitive mood" \
-        "\ni.e. \"Fix nasty bug\" rather than \"Fixed nasty bug\""
-      echo -e "${DGREY}------------------------------------------------------------------------${NC}"
-      echo -e "${YELLOW}${issue_line_text}${NC}"
-      echo -e "${DGREY}------------------------------------------------------------------------${NC}"
-      return 1
-    fi
+    error "Expecting the top line to match pattern '${split_pattern}'."
+    return 1
   fi
 }
 
@@ -769,7 +870,7 @@ list_unreleased_changes() {
     format_cmds=( "tee" )
   fi
 
-  echo "[${git_issue_str}]"
+  debug_value "format_cmds" "${format_cmds[*]}"
 
   # git_issue_str may be '*' so we must not quote it else the
   # globbing won't work
@@ -847,19 +948,28 @@ build_categories_regex() {
 
 is_change_category() {
   local text="${1:-}"
+  local is_case_sensitive="${2:-false}"
   if [[ -z "${text}" ]]; then
     return 1
   elif [[ ${#CHANGE_CATEGORIES[@]} -eq 0 ]]; then
     # Empty arr, no change categories
     return 1
   else
-    local lower_text="${1,,}"
-    for category in "${CHANGE_CATEGORIES[@]}"; do
-      local lower_category="${category,,}"
-      if [[ "${lower_text}" = "${lower_text}" ]]; then
-        return 0
-      fi
-    done
+    if [[ "${is_case_sensitive}" = true ]]; then
+      for category in "${CHANGE_CATEGORIES[@]}"; do
+        if [[ "${text}" = "${category}" ]]; then
+          return 0
+        fi
+      done
+    else
+      local lower_text="${1,,}"
+      for category in "${CHANGE_CATEGORIES[@]}"; do
+        local lower_category="${category,,}"
+        if [[ "${lower_text}" = "${lower_category}" ]]; then
+          return 0
+        fi
+      done
+    fi
     # Not found
     return 1
   fi
@@ -894,22 +1004,43 @@ validate_categories() {
 }
 
 parse_args() {
+  if [[ $# -gt 3 ]]; then
+    show_help_and_exit "Too many arguments."
+  fi
+
   if [[ $# -eq 0 ]]; then
     mode="interactive"
-
     # Try to extract the GH issue from the branch name
     get_git_issue_from_branch
-
     # If we are successful, then hit the api to get its details
     # so we can infer the category
     if [[ "${git_issue}" =~ $GIT_ISSUE_REGEX ]]; then
-      parse_git_issue "${git_issue}"
+      fetch_git_issue_info "${git_issue}"
     else
       git_issue=""
     fi
     return 0
   fi
 
+  # Special case for creating an entry for a specific issue
+  # e.g. ./log_change.sh 0
+  # e.g. ./log_change.sh 1234
+  if [[ $# -eq 1 ]] && [[ "$1" = "0" || "$1" =~ ${GIT_ISSUE_REGEX} ]]; then
+    mode="interactive"
+    git_issue="$1"
+    if [[ "${git_issue}" != "0" ]]; then
+      fetch_git_issue_info "${git_issue}"
+    fi
+    return 0
+  fi
+
+  # Show help
+  if [[ "$1" = "help" || "$1" = "-h" ]] ; then
+    show_help
+    exit 0
+  fi
+
+  # List existing unreleased changes
   if [[ "$1" = "list" ]] ; then
     if [[ $# -eq 1 ]]; then
       mode="list"
@@ -920,29 +1051,42 @@ parse_args() {
     fi
   fi
 
-  if [[ $# -gt 3 ]]; then
-    show_help_and_exit
-  fi
-
-  if [[ "$1" = "edit" ]] ; then
+  # Open issue in GitHub
+  if [[ "$1" = "link" ]] ; then
+    mode="link"
+    if [[ $# -gt 2 ]]; then
+      show_help_and_exit "Invalid arguments. 'link' should be the only" \
+        "argument or followed by the git issue number."
+    elif [[ $# -eq 1 ]]; then
+      # 'link' with no git issue, so drop out
+      return 0
+    fi
+  # Edit an existing unrleased change entry
+  elif [[ "$1" = "edit" ]] ; then
     mode="edit"
     if [[ $# -gt 2 ]]; then
       show_help_and_exit "Invalid arguments. 'edit' should be the only" \
         "argument or followed by the git issue number."
+    elif [[ $# -eq 1 ]]; then
+      # 'edit' with no git issue, so drop out
+      return 0
     fi
-  else
-    change_category="$1"
+  fi
+
+  # log is the default mode
+  if [[ "${mode}" = "log" ]]; then
+    change_category="${1:-}"
     if is_change_category "$1"; then
       normalise_change_category
       debug_value "change_category" "${change_category}"
     else
       show_help_and_exit "Invalid arguments. Expecting the first argument" \
-        "${BLUE}${change_category}${NC} to be a change " \
-        "category [${BLUE}${CHANGE_CATEGORIES[*]}${NC}]."
+        "${change_category} to be a change" \
+        "category [${CHANGE_CATEGORIES[*]}]."
     fi
   fi
 
-  git_issue="$2"
+  git_issue="${2:-}"
   debug_value "git_issue" "${git_issue}"
   if [[ "${git_issue}" != "0" ]]; then
     if [[ "${git_issue}" = "auto" ]]; then
@@ -950,18 +1094,18 @@ parse_args() {
       get_git_issue_from_branch
 
       if [[ -z "${git_issue}" ]]; then
-        error_exit "Unable to establish GitHub issue number from" \
-          "branch ${BLUE}${current_branch}${NC}"
+        error_exit "Unable to establish GitHub issue number from branch ${BLUE}${current_branch}${NC}"
       fi
     fi
 
     if [[ "${git_issue}" =~ $GIT_ISSUE_REGEX ]]; then
-      parse_git_issue "${git_issue}"
+      change_category_from_arg="${change_category}"
+      fetch_git_issue_info "${git_issue}"
     else
       show_help_and_exit "Invalid arguments. Expecting second argument" \
-        "${BLUE}${git_issue}${NC} to be" \
-        "a GitHub issue number (e.g. ${BLUE}1234${NC} or " \
-        "${BLUE}some-user/some-repo#1234${NC}) or '${BLUE}auto${NC}' to " \
+        "'${git_issue}' to be" \
+        "a GitHub issue number (e.g. 1234 or" \
+        "some-user/some-repo#1234) or 'auto' to" \
         "determine the issue number from the branch."
     fi
   fi
@@ -970,7 +1114,10 @@ parse_args() {
     change_text="$3"
     debug_value "change_text" "${change_text}"
     if [[ -n "${change_text}" ]]; then
-      validate_change_text_arg "${change_text}"
+      if ! is_validate_change_text "${change_text}"; then
+        cleanup_on_error
+        exit 1
+      fi
     fi
   fi
 }
@@ -1024,7 +1171,7 @@ capture_category() {
   else
     echo "${msg}"
     COLUMNS=1
-    PS3="Select the category for this change:"
+    PS3="Enter the number of the category for this change:"
     select user_input in "${CHANGE_CATEGORIES[@]}"; do
       if [[ -n "${user_input}" ]]; then
         change_category="${user_input}"
@@ -1061,8 +1208,8 @@ infer_category_from_issue_type() {
       # ',,' to compare in  lower case
       if [[ "${issue_type,,}" = "${category,,}" ]]; then
         change_category="${category}"
-        echo -e "Inferred change category '${BLUE}${change_category}${NC}'" \
-          "from the GitHub issue."
+        #echo -e "Inferred change category '${BLUE}${change_category}${NC}'" \
+          #"from the GitHub issue."
         break
       fi
     done
@@ -1070,8 +1217,28 @@ infer_category_from_issue_type() {
 }
 
 check_for_fzf() {
-  if command -v fzf > /dev/null; then
+  has_fzf=false
+  # DISABLE_FZF allows us to pretend fzf is not present for testing
+  # DISABLE_FZF=true ./log_change.sh ......
+  if [[ "${DISABLE_FZF:-false}" != true ]] && command -v fzf > /dev/null; then
     has_fzf=true
+  else
+    echo -e "${DGREY}log_chang.sh works better if fzf" \
+      "(command line fuzzy finder) is installed." \
+      "See https://junegunn.github.io/fzf/${NC}"
+  fi
+}
+
+check_for_jq() {
+  has_jq=false
+  # DISABLE_JQ allows us to pretend jq is not present for testing
+  # DISABLE_JQ=true ./log_change.sh ......
+  if [[ "${DISABLE_JQ:-false}" != true ]] && command -v jq > /dev/null; then
+    has_jq=true
+  else
+    echo -e "${DGREY}log_chang.sh works better if jq" \
+      "(command line JSON processor) is installed." \
+      "See https://jqlang.org${NC}"
   fi
 }
 
@@ -1085,6 +1252,49 @@ source_env_file() {
     error_exit "Config file ${BLUE}${tag_release_config_file}${NC}" \
       "doesn't exist. Run ${BLUE}./${TAG_RELEASE_SCRIPT_FILENAME}${NC}" \
       "to generate it."
+  fi
+}
+
+open_issue_in_github() {
+  if ! command -v xdg-open >/dev/null; then
+    error_exit "xdg-open is not installed. Can't open issue in GitHub."
+  fi
+
+  if [[ -z "${git_issue}" || "${git_issue}" = "auto" ]]; then
+    get_git_issue_from_branch
+  fi
+
+  if [[ -n "${git_issue}" ]]; then
+    parse_git_issue "${git_issue}"
+
+    local issue_url="https://github.com/${issue_namespace}/${issue_repo}/issues/${issue_number}"
+    echo -e "${GREEN}Issue link:${NC}   ${BLUE}${issue_url}${NC}"
+    read -rsp $'Press "y" to open the issue in the browser, any other key to cancel.\n' -n1 keyPressed
+
+    if [ "$keyPressed" = 'y' ] || [ "$keyPressed" = 'Y' ]; then
+      xdg-open "${issue_url}"
+    fi
+  else
+    error_exit "No git issue number"
+  fi
+}
+
+write_new_file() {
+  debug_value "new_file" "${new_file}"
+  debug_value "temp_file" "${temp_file}"
+  if [[ -n "${new_file}" && -n "${temp_file}" && -f "${temp_file}" ]]; then
+    local change_entry_line
+
+    if [[ -e "${new_file}" ]]; then
+      error_exit "Unable to write new file, ${BLUE}${new_file}${NC} already exists"
+    fi
+    mv "${temp_file}" "${new_file}"
+
+    change_entry_line="$( head -n1 "${new_file}" )"
+    info "Created file ${BLUE}${new_file}${GREEN}:"
+    info "${DGREY}------------------------------------------------------------------------${NC}"
+    info "${YELLOW}${change_entry_line}${NC}"
+    info "${DGREY}------------------------------------------------------------------------${NC}"
   fi
 }
 
@@ -1106,22 +1316,26 @@ main() {
   validate_env
   validate_in_git_repo
   check_for_fzf
+  check_for_jq
 
   # Ensure change_categories is set to an empty arr if unset
   #local -a change_categories=${CHANGE_CATEGORIES:-( )}
   local change_categories_regex
   local change_category=""
+  local change_category_from_arg=""
   local change_file=""
   local git_issue=""
   local change_text=""
   local mode="log"
   local issue_title=""
+  local issue_tags=""
   local issue_namespace=""
   local issue_type=""
   local issue_repo=""
   local issue_number=""
   local unreleased_dir="${repo_root_dir}/${UNRELEASED_DIR_NAME}"
   local new_file=""
+  local temp_file=""
   mkdir -p "${unreleased_dir}"
 
   build_categories_regex
@@ -1138,6 +1352,8 @@ main() {
 
   if [[ "${mode}" = "list" ]]; then
     list_unreleased_changes ""
+  elif [[ "${mode}" = "link" ]]; then
+    open_issue_in_github
   elif [[ "${mode}" = "edit" ]]; then
     if [[ -n "${git_issue}" ]]; then
       edit_change_file_if_present "${git_issue}" "" || true
@@ -1157,6 +1373,11 @@ main() {
       if [[ -z "${change_text}" ]]; then
         open_file_in_editor "${change_file}" "${git_issue}"
       fi
+    fi
+
+    debug_value "new_file" "${new_file}"
+    if [[ -n "${new_file}" ]]; then
+      write_new_file
     fi
   else
     error_exit "Unexpected mode ${mode}"
