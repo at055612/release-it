@@ -12,6 +12,13 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.5.1] - 2026-01-16
+
+* Build : Fix CI build.
+
+* Bug : Fix bug in category checking.
+
+
 ## [v0.5.0] - 2026-01-16
 
 * Bug : Fix tag_release so it checks for presence of branch on remote.
@@ -113,7 +120,8 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.5.0...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.5.1...master
+[v0.5.1]: https://github.com/at055612/release-it/compare/v0.5.0...v0.5.1
 [v0.5.0]: https://github.com/at055612/release-it/compare/v0.4.1...v0.5.0
 [v0.4.1]: https://github.com/at055612/release-it/compare/v0.4.0...v0.4.1
 [v0.4.0]: https://github.com/at055612/release-it/compare/v0.3.0...v0.4.0
