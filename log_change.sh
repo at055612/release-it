@@ -203,12 +203,6 @@ get_git_issue_from_branch() {
   )"
 
   debug_value "git_issue (from branch)" "${git_issue}"
-
-  #if [[ -z "${git_issue_from_branch}" ]]; then
-    #error_exit "Unable to establish GitHub issue number from" \
-      #"branch ${BLUE}${current_branch}${NC}"
-  #fi
-  #echo "${git_issue_from_branch}"
 }
 
 parse_git_issue() {
@@ -419,6 +413,7 @@ select_file_from_list() {
     fi
 
     # Do the -f test to handle the 'Create new file' entry
+    # {} is the selected item
     local fzf_preview_cmd="file={}; file=\"${unreleased_dir}/\${file#Open }\"; [[ -f \"\${file}\" ]] && head -n1 \"\${file}\""
     debug_value "fzf_preview_cmd" "${fzf_preview_cmd}"
 
@@ -505,7 +500,6 @@ read_git_issue_from_change_file() {
         || true
     )"
     debug_value "git_issue" "${git_issue}"
-
     
     # In case this is an old change file without the '# Issue number:' line
     # attempt to get it from the change entry line
@@ -553,7 +547,6 @@ edit_change_file_if_present() {
   done
 
   debug_value "existing_files" "${existing_files[@]:-()}"
-
   local existing_file_count="${#existing_files[@]}"
   debug_value "existing_file_count" "${existing_file_count}"
 
@@ -591,6 +584,8 @@ edit_all_files() {
   fi
 }
 
+# Writes the formatted git issue to stdout,
+# therefore don't echo anything else to stdout
 format_git_issue_for_filename() {
   local git_issue="$1"; shift
 
@@ -600,7 +595,7 @@ format_git_issue_for_filename() {
   else
     # replace / and # with _
     git_issue_str="${git_issue//[\#\/]/_}"
-    #debug_value "git_issue_str" "${git_issue_str}"
+    debug_value "git_issue_str" "${git_issue_str}"
   fi
   echo "${git_issue_str}"
 }
@@ -635,6 +630,7 @@ write_change_entry() {
   local issue_prefix="**"
   local issue_suffix="**"
 
+  # Examples:
   # * Bug **#1234** : Some text
   # * Feature **#1234** : Some text
   # * Feature **user/repo#1234** : Some text
@@ -653,11 +649,11 @@ write_change_entry() {
 
   local empty_change_text="< Enter the change entry description here >."
   local change_entry_line="${line_prefix}${category_part} ${issue_part}${change_text:-"${empty_change_text}"}"
-  local all_content
+  debug_value "change_entry_line" "${change_entry_line}"
 
   # Craft the content of the file
   # shellcheck disable=SC2016
-  all_content="$( \
+  {
     echo "${change_entry_line}" 
     echo
     echo
@@ -696,9 +692,9 @@ write_change_entry() {
     echo
     echo "# --------------------------------------------------------------------------------"
     echo "# The following is random text to make this file unique for git's change detection"
+    # Print 30 lines of 80 random chars to std out to make the file very unique for git
     # shellcheck disable=SC2034
     for ignored in {1..30}; do
-      # Print 80 random chars to std out
       echo -n "# "
       tr -dc A-Za-z0-9 </dev/urandom \
         | head -c 80 \
@@ -709,16 +705,7 @@ write_change_entry() {
     echo "# --------------------------------------------------------------------------------"
     echo
     echo '```'
-  )"
-
-  debug_value "change_file" "${change_file}"
-  debug_value "change_entry_line" "${change_entry_line}"
-
-  echo -e "${all_content}" > "${temp_file}"
-
-  #if [[ -z "${change_text}" ]]; then
-    #open_file_in_editor "${change_file}" "${git_issue}"
-  #fi
+  } > "${temp_file}"
 }
 
 # Return zero if the file was changed, else non-zero
@@ -735,6 +722,7 @@ open_file_in_editor() {
   info "Opening file ${BLUE}${file_to_open}${GREEN} in editor" \
     "(${BLUE}${editor}${GREEN})${NC}"
 
+  # Loop until the user saves a file that is valid
   while true; do
     if [[ "${is_first_pass}" = true ]]; then
       read -n 1 -s -r -p "Press any key to open the file"
@@ -857,7 +845,6 @@ validate_issue_line_in_file() {
 }
 
 list_unreleased_changes() {
-
   # if no git issue is provided use a wildcard so we can get all issues
   local git_issue_str="${1:-*}"; shift
   debug_value "git_issue_str" "${git_issue_str}"
@@ -895,13 +882,9 @@ list_unreleased_changes() {
     fi
   done
 
-  #if [[ "${#entry_map[@]}" -gt 0 ]]; then
   if [[ "${found_change_files}" = true ]]; then
-    #for filename in "${!MYMAP[@]}"; do echo $K; done
-
     # Remove the trailing blank lines
     list_output="$(echo -e "${list_output}" | head -n-2 )"
-
     echo -e "${list_output}"
   else
     info "There are no unreleased changes"
@@ -1125,6 +1108,8 @@ parse_args() {
 }
 
 capture_git_issue() {
+  # TODO we could hit the api and use fzf to pick an issue, but that is
+  # probably too much faff for too little gain.
   while true; do
     echo -e "Enter one of the following:"
     echo -e "  * The GitHub issue number (e.g. ${BLUE}1234${NC})."
