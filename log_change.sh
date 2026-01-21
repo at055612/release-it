@@ -191,13 +191,16 @@ get_git_issue_from_branch() {
   # Examples of branches that will give us an issue number:
   # 1234
   # gh-1234
+  # gh-1234-some-text
   # gh-1234_some-text
   # foo_1234_bar
+  # xxx/1234
+  # xxx/1234/yyy
   git_issue="$( \
     grep \
       --only-matching \
       --perl-regexp \
-      '(^[1-9][0-9]*$|((?<=[_-])|^)[1-9][0-9]*((?=[-_])|$))' \
+      '(^[1-9][0-9]*$|(((?<=[\/_\-])|^)[1-9][0-9]*((?=[\/_\-])|$)))' \
       <<< "${current_branch}" \
       || true \
   )"
@@ -252,6 +255,7 @@ fetch_git_issue_info() {
       "${github_issue_api_url}" \
   )"
   curl_return_code=$?
+  set -e
 
   if [[ "${has_jq}" = true ]]; then
     # jq is available so use it
@@ -285,7 +289,6 @@ fetch_git_issue_info() {
         <<< "${response_json}"
     )"
   fi
-  set -e
 
   debug_value "curl_return_code" "${curl_return_code}"
   debug_value "issue_title" "${issue_title}"
