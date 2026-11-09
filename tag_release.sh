@@ -19,6 +19,9 @@
 # Version: <BUILD_VERSION>
 # Date: <BUILD_DATE>
 
+# This script originates from https://github.com/at055612/release-it
+# Any changes should be made there and a new version released.
+
 # This script is for tagging a git repository for the purpose of driving a
 # separate release process from that tagged commit. It also updates the
 # changelog with details of the release.
