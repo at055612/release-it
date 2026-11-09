@@ -12,6 +12,11 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.5.5] - 2026-11-09
+
+* Feature : Add comment about source repo to header.
+
+
 ## [v0.5.4] - 2026-11-09
 
 * Bug : Fix typo in `grep` argument.
@@ -135,7 +140,8 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.5.4...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.5.5...master
+[v0.5.5]: https://github.com/at055612/release-it/compare/v0.5.4...v0.5.5
 [v0.5.4]: https://github.com/at055612/release-it/compare/v0.5.3...v0.5.4
 [v0.5.3]: https://github.com/at055612/release-it/compare/v0.5.2...v0.5.3
 [v0.5.2]: https://github.com/at055612/release-it/compare/v0.5.1...v0.5.2
