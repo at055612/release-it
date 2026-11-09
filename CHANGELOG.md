@@ -12,6 +12,11 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 ~~~
 
 
+## [v0.5.4] - 2026-11-09
+
+* Bug : Fix typo in `grep` argument.
+
+
 ## [v0.5.3] - 2026-01-21
 
 * Bug : Fix white space at end of line. Add copyright.
@@ -130,7 +135,8 @@ DO NOT ADD CHANGES HERE - ADD THEM USING log_change.sh
 * Initial release
 
 
-[Unreleased]: https://github.com/at055612/release-it/compare/v0.5.3...master
+[Unreleased]: https://github.com/at055612/release-it/compare/v0.5.4...master
+[v0.5.4]: https://github.com/at055612/release-it/compare/v0.5.3...v0.5.4
 [v0.5.3]: https://github.com/at055612/release-it/compare/v0.5.2...v0.5.3
 [v0.5.2]: https://github.com/at055612/release-it/compare/v0.5.1...v0.5.2
 [v0.5.1]: https://github.com/at055612/release-it/compare/v0.5.0...v0.5.1
